@@ -181,46 +181,23 @@ def read_session(
     session_id: str,
     keyword: str = "",
     limit: int = 10,
-    mode: str = "summary",
 ) -> dict:
-    """Read a Claude Code session. Use after search_sessions to drill in.
+    """Read user/assistant messages from a Claude Code session.
 
-    Modes:
-      - "summary": Returns cached AI summary if available (instant, cheap).
-        If uncached, returns minimal context — call session_summary() to generate.
-      - "messages": Returns head+tail user/assistant messages from the session.
-        Optional keyword filters to only matching messages.
+    Returns head+tail messages for quick context. Optional keyword
+    filters to only matching messages. Use session_summary() for
+    AI-generated summaries instead.
     """
     limit = max(1, min(limit, 30))
     session = _find_session(session_id)
     if session is None:
         return {"error": f"Session {session_id[:36]} not found"}
 
-    if mode == "summary":
-        ck = _cache.cache_key(session["file"])
-        cached = _cache.get(session_id, ck, "summary")
-        if not cached:
-            # Try stale cache — title/summary still useful for active sessions
-            data = _cache._read(session_id)
-            cached = data.get("summary") if isinstance(data.get("summary"), dict) else None
-        if cached:
-            return {
-                "id": session_id,
-                "project": shorten_path(session["project_dir"]),
-                "date": datetime.fromtimestamp(session["mtime"]).strftime("%Y-%m-%d %H:%M"),
-                "summary": cached,
-            }
-        return {
-            "id": session_id,
-            "project": shorten_path(session["project_dir"]),
-            "date": datetime.fromtimestamp(session["mtime"]).strftime("%Y-%m-%d %H:%M"),
-            "note": "No cached summary. Call session_summary() to generate one.",
-        }
-
-    elif mode == "messages":
-        return _read_messages(session["file"], keyword, limit)
-
-    return {"error": f"Unknown mode: {mode}. Use 'summary' or 'messages'."}
+    result = _read_messages(session["file"], keyword, limit)
+    result["id"] = session_id
+    result["project"] = shorten_path(session["project_dir"])
+    result["date"] = datetime.fromtimestamp(session["mtime"]).strftime("%Y-%m-%d %H:%M")
+    return result
 
 
 def _read_messages(session_file: Path, keyword: str, limit: int) -> dict:
@@ -471,16 +448,70 @@ def boot_up(hours: int = 24) -> dict:
     }
 
 
-@mcp.tool()
-def resume_in_terminal(session_id: str) -> dict:
-    """Launch a Claude --resume session in a new iTerm2 window.
+def _launch_terminal(project_dir: str, command: str) -> dict | None:
+    """Open a terminal window, cd to project, run command.
 
-    Opens iTerm2, cd's to the project directory, and runs
-    claude --resume <id> --dangerously-skip-permissions.
-    Use after boot_up() to quickly resume interrupted sessions.
+    Tries iTerm2 first (AppleScript), falls back to macOS Terminal.app.
+    Returns error dict on failure, None on success.
     """
     import subprocess
+    import platform
 
+    if platform.system() != "Darwin":
+        return {"error": "Terminal launch requires macOS. Run manually.", "command": command, "directory": project_dir}
+
+    # Try iTerm2 first
+    iterm_script = f'''
+    tell application "iTerm2"
+        activate
+        set newWindow to (create window with default profile)
+        tell current session of newWindow
+            write text "cd {project_dir}"
+            write text {json.dumps(command)}
+        end tell
+    end tell
+    '''
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", iterm_script],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return None
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
+    # Fall back to Terminal.app
+    terminal_script = f'''
+    tell application "Terminal"
+        activate
+        do script "cd {project_dir} && {command}"
+    end tell
+    '''
+    try:
+        subprocess.run(
+            ["osascript", "-e", terminal_script],
+            capture_output=True, text=True, timeout=10,
+        )
+        return None
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return {"error": f"Failed to launch terminal: {e}", "command": command, "directory": project_dir}
+
+
+@mcp.tool()
+def resume_in_terminal(session_id: str, fork: bool = False) -> dict:
+    """Resume or fork a Claude Code session in a new terminal window.
+
+    Default: resumes the session (continues same session ID).
+    With fork=True: creates a new session ID with the full conversation
+    history — like git branch. Original session stays untouched.
+
+    Tries iTerm2 first, falls back to Terminal.app. On non-macOS,
+    returns the command to run manually.
+
+    Note: --resume requires the correct project directory. The terminal
+    window cd's there automatically.
+    """
     session = _find_session(session_id)
     if session is None:
         return {"error": f"Session {session_id[:36]} not found"}
@@ -488,28 +519,17 @@ def resume_in_terminal(session_id: str) -> dict:
     project_dir = session["project_dir"]
     title = _get_title(session_id, session["file"]) or project_dir
 
-    # AppleScript to open iTerm2 with the resume command
-    script = f'''
-    tell application "iTerm2"
-        activate
-        set newWindow to (create window with default profile)
-        tell current session of newWindow
-            write text "cd {project_dir}"
-            write text "claude --resume {session_id} --dangerously-skip-permissions"
-        end tell
-    end tell
-    '''
+    cmd = f"claude --resume {session_id}"
+    if fork:
+        cmd += " --fork-session"
 
-    try:
-        subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (subprocess.TimeoutExpired, OSError) as e:
-        return {"error": f"Failed to launch iTerm2: {e}"}
+    err = _launch_terminal(project_dir, cmd)
+    if err:
+        return err
 
     return {
         "launched": True,
+        "forked": fork,
         "session_id": session_id,
         "project": shorten_path(project_dir),
         "title": _trunc(title, 80),
