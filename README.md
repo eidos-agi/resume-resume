@@ -48,7 +48,7 @@ Launches instantly. Shows your recent sessions grouped by time. Each one gets an
 ## Install
 
 ```bash
-git clone https://github.com/rhea-impact/claude-resume
+git clone https://github.com/eidos-agi/claude-resume
 cd claude-resume
 pip install -e .
 ```
@@ -156,10 +156,10 @@ python train_classifier.py
 
 All five launch features are implemented:
 
-- [x] [**Resume directly**](https://github.com/rhea-impact/claude-resume/issues/1) — `r` to exec into a session
-- [x] [**Multi-select workspace recovery**](https://github.com/rhea-impact/claude-resume/issues/2) — Space to select, Enter/r to open all in iTerm tabs
-- [x] [**Smart sort by interruption**](https://github.com/rhea-impact/claude-resume/issues/3) — sessions scored by how interrupted they look
-- [x] [**Export context briefing**](https://github.com/rhea-impact/claude-resume/issues/4) — `x` to copy markdown briefing to clipboard
+- [x] [**Resume directly**](https://github.com/eidos-agi/claude-resume/issues/1) — `r` to exec into a session
+- [x] [**Multi-select workspace recovery**](https://github.com/eidos-agi/claude-resume/issues/2) — Space to select, Enter/r to open all in iTerm tabs
+- [x] [**Smart sort by interruption**](https://github.com/eidos-agi/claude-resume/issues/3) — sessions scored by how interrupted they look
+- [x] [**Export context briefing**](https://github.com/eidos-agi/claude-resume/issues/4) — `x` to copy markdown briefing to clipboard
 - [x] **Session bookmarks** — `/bookmark` in Claude Code to capture lifecycle state, displayed as badges in the TUI
 
 ## License
