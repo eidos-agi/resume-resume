@@ -2,7 +2,7 @@
 
 **Your Mac crashed. Your Claude Code sessions didn't.**
 
-A terminal UI that finds your recently active Claude Code sessions, tells you what each one was doing, and gets you back to work with one keypress.
+A terminal UI + MCP server that finds your recently active Claude Code sessions, tells you what each one was doing, and gets you back to work fast — or lets Claude search and reason over your full session history.
 
 ## The Problem
 
@@ -12,7 +12,10 @@ Claude Code stores session data in `~/.claude/projects/` as JSONL files, but goo
 
 ## What This Does
 
-Launches instantly. Shows your recent sessions grouped by time. Each one gets an AI-generated summary of what you were working on, where you left off, and which files matter. Arrow to the one you want, hit Enter, and the resume command is on your clipboard.
+Two things, independently useful:
+
+1. **TUI** — A terminal interface for crash recovery. Launches instantly, shows recent sessions with AI summaries, lets you arrow to the one you want and hit `r` to resume.
+2. **MCP server** — Gives Claude (or any MCP client) tools to search, read, and reason over your full session history. "Find the session where we built the auth middleware." It searches 5,000+ sessions in ~3 seconds.
 
 ```
 ┌─ claude-resume ─────────────────────┬──────────────────────────────────────┐
@@ -53,20 +56,21 @@ cd claude-resume
 pip install -e .
 ```
 
-This puts `claude-resume` on your PATH immediately. Since it's an editable install (`-e`), pulling updates from the repo takes effect without reinstalling.
+This puts `claude-resume` and `claude-resume-mcp` on your PATH. Since it's an editable install (`-e`), pulling updates from the repo takes effect without reinstalling.
 
-Requires Python 3.11+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (uses `claude -p` for summaries).
+Requires Python 3.11+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (uses `claude -p` for AI summaries).
 
-## Usage
+## TUI Usage
 
 ```bash
 claude-resume            # Sessions from last 4 hours
+cr                       # Short alias
 claude-resume 24         # Last 24 hours
 claude-resume --all      # Everything
 claude-resume --cache-all  # Pre-index all sessions (background, slow)
 ```
 
-## Keyboard Shortcuts
+### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -82,6 +86,109 @@ claude-resume --cache-all  # Pre-index all sessions (background, slow)
 | `p` | Patterns — analyze your prompting habits |
 | `b` | Toggle automated/bot sessions |
 | `Esc` | Quit |
+
+## MCP Server
+
+The MCP server lets Claude search and reason over your session history directly from a conversation. Add it to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "claude-resume": {
+      "command": "claude-resume-mcp"
+    }
+  }
+}
+```
+
+Or launch it manually:
+
+```bash
+claude-resume-mcp
+```
+
+### MCP Tools Reference
+
+#### `boot_up(hours=24)`
+**Crash recovery.** Finds sessions that were recently active but didn't exit cleanly — crashed terminals, killed processes, laptop sleep/restart. Returns a prioritized list scored by urgency (recency + dirty files). Use this after a reboot or "what was I working on?" moment.
+
+```
+{total: 3, running: 1, checked: 47, sessions: [...]}
+```
+
+#### `recent_sessions(hours=24, limit=10)`
+List recently active sessions. Simple — project path, date, and cached title for each. Resume any with `claude --resume <id>`.
+
+#### `search_sessions(query, limit=10)`
+**Full-text search across all sessions** (~3s for 5,000+ sessions). Uses AND logic for multi-word queries, supports quoted phrases for exact matches.
+
+Ranked by a multi-signal Reciprocal Rank Fusion score:
+- **Term frequency** — how often the terms appear (with diminishing returns)
+- **Term density** — matches per KB (favors focused sessions over large dumps)
+- **Recency** — exponential decay with 30-day half-life
+- **Title boost** — 3x weight if terms appear in the cached session title
+
+Returns each result with a contextual snippet showing where the match occurs.
+
+```python
+search_sessions("auth middleware jwt")           # AND: all three must appear
+search_sessions('"token refresh" race condition') # Exact phrase + word
+search_sessions("eidos benchmark", limit=5)
+```
+
+#### `read_session(session_id, keyword="", limit=10)`
+Read user/assistant messages from a session. Returns head + tail for quick context. Optional keyword filter narrows to only matching messages.
+
+#### `session_summary(session_id, force_regenerate=False)`
+Get or generate an AI summary for a session. Returns instantly from cache if available. If not cached, queues to the background daemon (~15s) or generates synchronously (~30s fallback).
+
+Summary includes: title, goal, what was done, state, key files, decisions made, next steps.
+
+#### `merge_context(session_id, mode="hybrid", keyword="", message_limit=6)`
+**Import context from another session into this one.** Use this to pull research, decisions, or progress from a previous session without copy-pasting.
+
+Modes:
+- `"summary"` — AI summary only (~1-2k tokens). Fast, compact.
+- `"messages"` — Head+tail user/assistant messages (~1-5k tokens). Richer.
+- `"hybrid"` — Summary + last few messages (~2-4k tokens). Best default.
+
+Returns a formatted markdown context block ready for Claude to consume directly.
+
+#### `session_timeline(session_id, limit=50, focus="recent", after="", before="")`
+**Structured timeline of milestones** from a session — file creates/edits, git commits, user instructions, and significant tool calls. Solves the "black box" problem for long sessions: understand what happened in a 2,000-message session without reading every message.
+
+Focus options:
+- `"recent"` — 70% tail + 30% head. Best for "where did we leave off?"
+- `"even"` — Evenly spaced across the full session. Best for the whole arc.
+- `"full"` — Most recent events first, no sampling.
+
+Supports `after`/`before` ISO timestamp filters.
+
+#### `session_thread(session_id)`
+**Follow continuation links** to reconstruct a multi-session thread. When sessions are continued via merge_context or bookmarks, traces the chain and returns all linked sessions in chronological order. Use when you suspect work spans multiple sessions.
+
+#### `resume_in_terminal(session_id, fork=False)`
+Open a session in a new terminal window (macOS only). Tries iTerm2 first, falls back to Terminal.app. With `fork=True`, creates a new session with the full conversation history — like `git branch` for sessions.
+
+### Data Science Tools
+
+A second set of tools for analyzing your session history at scale.
+
+#### `session_insights(section="all", max_sessions=0)`
+Deep analytics on all your Claude Code sessions. First call takes 30-60s (parses JSONL files); subsequent calls are cached.
+
+Sections: `overview`, `temporal`, `projects`, `tools`, `models`, `records`, `predictions`, `personality`, `fun_facts` — or `all` for everything.
+
+Surfaces patterns like peak productivity hours, most-used tools, your "coding personality," streaks, and predictions about your habits.
+
+#### `session_xray(session_id)`
+Deep single-session breakdown — duration, tool call counts, token usage, conversation branches, edit/revert patterns, everything.
+
+#### `session_report(output_path="", org="")`
+Generate a full analytics report as an HTML or markdown file.
+
+#### `session_data_science(query)`
+Natural language interface for ad-hoc queries over your session history. Ask anything — the tool routes to the right analytics functions.
 
 ## Session Bookmarks
 
@@ -105,9 +212,7 @@ Bookmarked sessions show a colored badge in the TUI list:
 | `HANDOFF` (cyan) | Someone else is taking over |
 | `AUTO` (dim) | Session closed without explicit bookmark |
 
-The preview pane shows bookmark data — next actions, blockers, confidence — below the AI summary. The `x` export includes it in the markdown briefing.
-
-Sessions without bookmarks work exactly as before (AI-inferred state). Bookmarks are additive — they enrich, they don't replace.
+The preview pane shows bookmark data — next actions, blockers, confidence — below the AI summary. The `x` export includes it in the markdown briefing. The `boot_up` MCP tool uses bookmark data to distinguish clean exits from crashes.
 
 ### How bookmarks get created
 
@@ -124,11 +229,7 @@ Bookmarked sessions get lifecycle-aware interruption scores:
 - `paused` → minimum score 20 (low urgency)
 - `auto-closed` → normal heuristic scoring
 
-### Setup
-
-The `/bookmark` skill lives at `~/.claude/skills/bookmark/SKILL.md`. The auto-bookmark hook lives at `~/.claude/hooks/session_bookmark_auto.sh`. Both are installed alongside this repo — see the [install instructions](#install).
-
-Bookmark data is stored in the same `~/.claude/resume-summaries/` cache that claude-resume already reads from (as a `bookmark` field in each session's JSON). A backup goes to devlog for cross-machine durability.
+Bookmark data is stored in `~/.claude/resume-summaries/` (as a `bookmark` field in each session's JSON) and backed up to devlog for cross-machine durability.
 
 ## How It Works
 
@@ -152,15 +253,10 @@ pip install -e ".[train]"
 python train_classifier.py
 ```
 
-## Roadmap
+## Related
 
-All five launch features are implemented:
-
-- [x] [**Resume directly**](https://github.com/eidos-agi/claude-resume/issues/1) — `r` to exec into a session
-- [x] [**Multi-select workspace recovery**](https://github.com/eidos-agi/claude-resume/issues/2) — Space to select, Enter/r to open all in iTerm tabs
-- [x] [**Smart sort by interruption**](https://github.com/eidos-agi/claude-resume/issues/3) — sessions scored by how interrupted they look
-- [x] [**Export context briefing**](https://github.com/eidos-agi/claude-resume/issues/4) — `x` to copy markdown briefing to clipboard
-- [x] **Session bookmarks** — `/bookmark` in Claude Code to capture lifecycle state, displayed as badges in the TUI
+- [claude-session-commons](https://github.com/eidos-agi/claude-session-commons) — Shared session parsing utilities used by this repo and claude-resume-duet
+- [claude-resume-duet](https://github.com/eidos-agi/claude-resume-duet) — Web UI companion with session browser, key moments, and URL scheme handler (`claude-resume://`)
 
 ## License
 
