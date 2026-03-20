@@ -10,11 +10,11 @@
 
 | | |
 |---|---|
-| **Resume** | Ask Claude Resume to find old programming sessions in plain English, and pick up where you left off. |
-| **Prioritize** | Claude Resume auto-ranks your past chats based on recency and incomplete worktrees, so you don't leave important work unfinished or uncommitted. |
-| **Speed** | Claude Resume uses parallelized search to look through gigabytes of past chats in seconds. |
-| **Cost Savings** | Claude Resume uses Haiku (smallest Claude model) to summarize past context once, then caches it permanently — so after the first run, searching thousands of sessions costs nothing. |
-| **Merge** | Ask Claude Resume to merge multiple old chats together, pulling your thoughts across sessions into a single conversation. |
+| **Resume** | Ask resume-resume to find old programming sessions in plain English, and pick up where you left off. |
+| **Prioritize** | resume-resume auto-ranks your past chats based on recency and incomplete worktrees, so you don't leave important work unfinished or uncommitted. |
+| **Speed** | resume-resume uses parallelized search to look through gigabytes of past chats in seconds. |
+| **Cost Savings** | resume-resume uses Haiku (smallest Claude model) to summarize past context once, then caches it permanently — so after the first run, searching thousands of sessions costs nothing. |
+| **Merge** | Ask resume-resume to merge multiple old chats together, pulling your thoughts across sessions into a single conversation. |
 
 ---
 
