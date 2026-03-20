@@ -402,11 +402,22 @@ def _extract_window_context(filepath) -> dict[str, str]:
 def _window_summary_adapter(context: str) -> str:
     """Generate a window summary from context text.
 
-    Adapter — swap this implementation when a local model is ready.
-    Currently: extract the last meaningful user message from the context (~500 chars).
-    Future: call local ONNX/GGUF model here, no claude -p, no network.
+    Tries the commons ONNX summarizer first (download-on-first-use, no claude -p).
+    Falls back to extracting the last meaningful user message (~500 chars).
+
+    To upgrade: fine-tune a model with claude_session_commons.summarizer,
+    host it on HuggingFace, and set CLAUDE_SUMMARIZER_URL to point at it.
     """
-    # Pull last user: line from context
+    try:
+        from claude_session_commons.summarizer import is_available, summarize
+        if is_available():
+            result = summarize(context)
+            if result:
+                return result
+    except ImportError:
+        pass
+
+    # Fallback: last user message, trimmed
     last_user = ""
     for line in reversed(context.splitlines()):
         line = line.strip()
@@ -414,7 +425,6 @@ def _window_summary_adapter(context: str) -> str:
             last_user = line[5:].strip()
             break
     text = last_user or context.strip()
-    # Trim to ~500 chars at a word boundary
     if len(text) > 500:
         text = text[:500].rsplit(" ", 1)[0] + "…"
     return text or "no activity"
