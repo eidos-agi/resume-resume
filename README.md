@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="resume-resume" width="480"/>
+  <img src="https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/logo.png" alt="resume-resume" width="480"/>
 </p>
 
 # resume-resume
@@ -43,19 +43,19 @@ We built **Eidos**, a multi-agent AI system. In [our benchmark](https://github.c
 
 > *"use resume-resume to find the eidos test where we beat claude"*
 
-![Claude Resume eidos benchmark search](assets/example-eidos-beat.png)
+![resume-resume eidos benchmark search](https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/example-eidos-beat.png)
 
 ### Searching for a past session in plain English
 
 > *"use resume-resume to find the latest chats about eidos philosophy docs"*
 
-![Claude Resume search example](assets/example-search.png)
+![resume-resume search example](https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/example-search.png)
 
 ### Merging multiple past sessions into this chat
 
 > *"use claude resume to merge march 14th conversations and Eidos v5 Pipeline Telemetry convo from march 11th into this chat"*
 
-![Claude Resume merge example](assets/example-merge.png)
+![resume-resume merge example](https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/example-merge.png)
 
 Two sessions — one about eidos-philosophy doc changes (Mar 14) and one with a full 28-task strategic plan (Mar 11) — merged into the current conversation with a single command.
 
@@ -88,7 +88,7 @@ cr 24                # last 24 hours
 cr --all             # everything
 ```
 
-![resume-resume TUI](assets/tui.png)
+![resume-resume TUI](https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/tui.png)
 
 | Key | Action |
 |-----|--------|
