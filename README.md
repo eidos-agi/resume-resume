@@ -1,6 +1,18 @@
+<p align="center">
+  <img src="assets/logo.png" alt="claude-resume" width="480"/>
+</p>
+
 # claude-resume
 
-**Your Mac crashed. Your Claude Code sessions didn't.**
+**New free tool we're dropping.**
+
+| | |
+|---|---|
+| **Resume** | Ask Claude Resume to find old programming sessions in plain English, and pick up where you left off. |
+| **Prioritize** | Claude Resume auto-ranks your past chats based on recency and incomplete worktrees, so you don't leave important work unfinished or uncommitted. |
+| **Speed** | Claude Resume uses parallelized search to look through gigabytes of past chats in seconds. |
+| **Cost Savings** | Claude Resume uses Haiku (smallest Claude model) to summarize past context once, then caches it permanently — so after the first run, searching thousands of sessions costs nothing. |
+| **Merge** | Ask Claude Resume to merge multiple old chats together, pulling your thoughts across sessions into a single conversation. |
 
 A terminal UI + MCP server that finds your recently active Claude Code sessions, tells you what each one was doing, and gets you back to work fast — or lets Claude search and reason over your full session history.
 
@@ -47,6 +59,26 @@ Two things, independently useful:
 │                                     │   • src/api/client.ts                │
 └─────────────────────────────────────┴──────────────────────────────────────┘
 ```
+
+## Examples
+
+We built **Eidos**, a multi-agent AI system. In [our benchmark](https://github.com/eidos-agi/cockpit-eidos), Eidos outperformed a single Claude model by **3.6x** in both accuracy and speed on complex tasks with 15+ reasoning chains. Below, we use Claude Resume to pick up where we left off across multiple sessions.
+
+### Searching for a past session in plain English
+
+> *"use claude-resume to find the eidos test where we beat claude"*
+
+![Claude Resume search example](assets/example-search.png)
+
+Claude Resume searches 5,000+ sessions in ~3 seconds and surfaces the exact session — including the benchmark result snippet showing the 3.6x outperformance.
+
+### Merging multiple past sessions into this chat
+
+> *"use claude resume to merge march 14th conversations and Eidos v5 Pipeline Telemetry convo from march 11th into this chat"*
+
+![Claude Resume merge example](assets/example-merge.png)
+
+Two sessions — one about eidos-philosophy doc changes (Mar 14) and one with the full 28-task strategic plan (Mar 11) — merged into the current conversation with a single command.
 
 ## Install
 
