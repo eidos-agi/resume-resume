@@ -399,19 +399,32 @@ def _extract_window_context(filepath) -> dict[str, str]:
 
 
 
-def _window_summary_adapter(context: str) -> str:
+def _window_summary_adapter(context: str, session_file: str | None = None) -> str:
     """Generate a window summary from context text.
 
-    Tries the commons ONNX summarizer first (download-on-first-use, no claude -p).
-    Falls back to extracting the last meaningful user message (~500 chars).
+    Classifies session origin first (human vs agent) to select the correct
+    T5 prompt prefix — ensuring distinct summary styles for re-entry vs review.
 
-    To upgrade: fine-tune a model with claude_session_commons.summarizer,
-    host it on HuggingFace, and set CLAUDE_SUMMARIZER_URL to point at it.
+    Tries the commons ONNX summarizer (download-on-first-use, no claude -p).
+    Falls back to last meaningful user message (~500 chars).
     """
+    # Determine origin so we condition the summarizer correctly
+    origin = "human"
+    if session_file:
+        try:
+            from claude_session_commons.classify import get_label
+            from pathlib import Path
+            label = get_label(Path(session_file))
+            origin = "human" if label == "interactive" else "agent"
+        except Exception:
+            origin = "agent" if "/subagents/" in (session_file or "") else "human"
+
+    prefix = f"summarize {origin} session: "
+
     try:
         from claude_session_commons.summarizer import is_available, summarize
         if is_available():
-            result = summarize(context)
+            result = summarize(prefix + context)
             if result:
                 return result
     except ImportError:
@@ -584,6 +597,7 @@ class ResumeV2App(App):
         ("escape", "back", "Back"),
         ("v", "noop", "VS Code"),
         ("r", "noop", "iTerm2"),
+        ("t", "toggle_view", "Toggle resume/review"),
     ]
 
     def action_noop(self) -> None:
@@ -611,6 +625,9 @@ class ResumeV2App(App):
         self._search_results: list[tuple[dict, int]] = []
         self._current_items: list[dict] = []  # sessions shown in nav pane
         self._scores: dict[str, float] = {}  # session_id -> score (pre-computed)
+        # "resume" = human-initiated sessions only (default)
+        # "review" = AI-spawned sessions (subagents, automated runs)
+        self.view_mode: str = "resume"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -625,7 +642,7 @@ class ResumeV2App(App):
 
     def on_mount(self) -> None:
         self.title = "cr v2"
-        self.sub_title = "Claude Code Session Browser"
+        self.sub_title = "RESUME mode — [T] to switch to review"
         self._load_sessions()
 
         if self.search_term:
@@ -636,9 +653,42 @@ class ResumeV2App(App):
         # Pre-compute all scores in background — UI uses _scores dict for instant lookup
         self._precompute_scores_bg()
 
+    def _classify_origin(self, s: dict) -> str:
+        """Return 'human' or 'agent' for a session dict. Fast path only."""
+        from pathlib import Path as _Path
+        filepath = str(s.get("file", ""))
+        # Check persistent cache field first
+        sid = s.get("session_id", "")
+        if sid:
+            try:
+                ck = self.cache.cache_key(_Path(filepath))
+                cached = self.cache.get(sid, ck, "classification")
+                if cached == "interactive":
+                    return "human"
+                if cached == "automated":
+                    return "agent"
+            except Exception:
+                pass
+        # Path heuristic fallback
+        return "agent" if "/subagents/" in filepath else "human"
+
     def _load_sessions(self) -> None:
-        self.sessions = find_recent_sessions(self.hours, max_sessions=200)
+        all_sessions = find_recent_sessions(self.hours, max_sessions=500)
+        # Route by origin: resume = human-initiated, review = AI-spawned
+        if self.view_mode == "resume":
+            self.sessions = [s for s in all_sessions if self._classify_origin(s) == "human"]
+        else:
+            self.sessions = [s for s in all_sessions if self._classify_origin(s) == "agent"]
         self.grouped = _group_sessions(self.sessions)
+
+    def action_toggle_view(self) -> None:
+        """Toggle between resume (human) and review (AI-spawned) session views."""
+        self.view_mode = "review" if self.view_mode == "resume" else "resume"
+        self._load_sessions()
+        self._show_groups()
+        mode_label = "[bold green]RESUME[/] (your sessions)" if self.view_mode == "resume" \
+            else "[bold yellow]REVIEW[/] (AI-spawned)"
+        self.sub_title = f"Mode: {mode_label.replace('[bold green]','').replace('[bold yellow]','').replace('[/]','')} — press T to toggle"
 
     @work(thread=True)
     def _precompute_scores_bg(self) -> None:
