@@ -10,7 +10,7 @@ Improvements over v1:
 - CalibratedClassifierCV for real probability estimates
 - Opus fallback for gray zone sessions via `claude -p`
 
-Output: serialized model + feature config at claude_resume/classifier.pkl
+Output: serialized model + feature config at resume_resume/classifier.pkl
 """
 
 import json
@@ -32,7 +32,7 @@ from sklearn.model_selection import cross_val_score, StratifiedKFold, train_test
 from sklearn.metrics import classification_report
 from sklearn.tree import DecisionTreeClassifier, export_text
 
-from claude_resume.sessions import (
+from resume_resume.sessions import (
     find_all_sessions, classify_session, quick_scan,
     PROJECTS_DIR, MIN_SESSION_BYTES,
 )
@@ -343,7 +343,7 @@ def main():
         print(f"    {col:25s}  interactive={int_mean:.4f}  automated={auto_mean:.4f}  {direction}")
 
     # ── Serialize calibrated model ───────────────────────────
-    model_path = Path(__file__).parent / "claude_resume" / "classifier.pkl"
+    model_path = Path(__file__).parent / "resume_resume" / "classifier.pkl"
     model_data = {
         "model": gb_calibrated,
         "feature_cols": FEATURE_COLS,

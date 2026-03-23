@@ -8,4 +8,4 @@ depends_on: ["GOAL-001"]
 unlocks: []
 ---
 
-Update summarizer prompt prefix to condition on origin: `"summarize human session: ..."` vs `"summarize agent session: ..."`. Training on mixed unlabeled data produces poisoned signal. Files: `claude_session_commons/summarizer/dataset.py`, `resume-resume/claude_resume/ui_v2.py`
+Update summarizer prompt prefix to condition on origin: `"summarize human session: ..."` vs `"summarize agent session: ..."`. Training on mixed unlabeled data produces poisoned signal. Files: `claude_session_commons/summarizer/dataset.py`, `resume-resume/resume_resume/ui_v2.py`

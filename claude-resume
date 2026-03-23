@@ -6,7 +6,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
-from claude_resume.cli import main
+from resume_resume.cli import main
 
 if __name__ == "__main__":
     main()

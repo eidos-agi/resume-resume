@@ -26,9 +26,9 @@ train = [
 ]
 
 [project.scripts]
-resume-resume = "claude_resume.cli:main"
-resume-resume-mcp = "claude_resume.mcp_server:main"
-cr = "claude_resume.cli:main"
+resume-resume = "resume_resume.cli:main"
+resume-resume-mcp = "resume_resume.mcp_server:main"
+cr = "resume_resume.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["claude_resume*"]
+include = ["resume_resume*"]

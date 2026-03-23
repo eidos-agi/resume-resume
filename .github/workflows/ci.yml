@@ -57,4 +57,4 @@ jobs:
         run: |
           python -m venv /tmp/test-venv
           /tmp/test-venv/bin/pip install dist/*.whl
-          /tmp/test-venv/bin/python -c "import claude_resume; print('OK')"
+          /tmp/test-venv/bin/python -c "import resume_resume; print('OK')"

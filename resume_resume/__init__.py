@@ -1,4 +1,4 @@
-"""claude-resume — Post-crash Claude Code session recovery."""
+"""resume-resume — Post-crash Claude Code session recovery."""
 
 from .sessions import (
     SessionCache,

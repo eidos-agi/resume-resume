@@ -8,4 +8,4 @@ depends_on: ["GOAL-002"]
 unlocks: []
 ---
 
-The resume-resume TUI session list defaults to human-initiated sessions only. AI-spawned sessions surfaced in a separate review view. Files: `resume-resume/claude_resume/tui/`, `resume-resume/claude_resume/ui_v2.py`
+The resume-resume TUI session list defaults to human-initiated sessions only. AI-spawned sessions surfaced in a separate review view. Files: `resume-resume/resume_resume/tui/`, `resume-resume/resume_resume/ui_v2.py`
