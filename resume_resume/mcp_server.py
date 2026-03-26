@@ -510,6 +510,99 @@ def session_summary(session_id: str, force_regenerate: bool = False,
     return {"id": session_id, "source": "generated", "tier": tier, **summary}
 
 
+def _scan_repo_git(repo_path: str) -> dict | None:
+    """Run git status --porcelain + git log on a repo. Returns None if not a git repo."""
+    import subprocess
+
+    repo = Path(repo_path)
+    if not repo.exists() or not (repo / ".git").exists():
+        return None
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, timeout=5, cwd=repo,
+        )
+        dirty_files = [
+            line.strip() for line in status.stdout.splitlines() if line.strip()
+        ]
+        log = subprocess.run(
+            ["git", "log", "--oneline", "-3", "--format=%h %ar %s"],
+            capture_output=True, text=True, timeout=5, cwd=repo,
+        )
+        recent_commits = [
+            line.strip() for line in log.stdout.splitlines() if line.strip()
+        ]
+        branch = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True, text=True, timeout=5, cwd=repo,
+        )
+
+        # Find the most recent mtime among dirty files for urgency scoring
+        latest_mtime = 0.0
+        for line in status.stdout.splitlines():
+            if not line.strip():
+                continue
+            # porcelain format: XY filename (or XY "filename with spaces")
+            fname = line[3:].strip().strip('"')
+            try:
+                fpath = repo / fname
+                if fpath.exists():
+                    mt = fpath.stat().st_mtime
+                    if mt > latest_mtime:
+                        latest_mtime = mt
+            except OSError:
+                continue
+
+        return {
+            "path": shorten_path(repo_path),
+            "branch": branch.stdout.strip(),
+            "dirty_files": dirty_files[:15],
+            "dirty_file_count": len(dirty_files),
+            "recent_commits": recent_commits,
+            "dirty": len(dirty_files) > 0,
+            "latest_dirty_mtime": latest_mtime,
+        }
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+
+def _extract_last_user_message(session_file: Path) -> str:
+    """Read last user message from a JSONL session file for context when no summary exists."""
+    try:
+        # Read last 50KB — enough to find the last user message
+        size = session_file.stat().st_size
+        read_size = min(size, 50 * 1024)
+        with open(session_file, "rb") as f:
+            if size > read_size:
+                f.seek(size - read_size)
+            tail = f.read().decode("utf-8", errors="replace")
+
+        last_msg = ""
+        for line in tail.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("type") == "human":
+                msg = entry.get("message", {})
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+                    if isinstance(content, str) and content.strip():
+                        last_msg = content.strip()
+                    elif isinstance(content, list):
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                text = part.get("text", "").strip()
+                                if text:
+                                    last_msg = text
+        return last_msg[:120] if last_msg else ""
+    except OSError:
+        return ""
+
+
 @mcp.tool()
 def boot_up(hours: int = 24) -> dict:
     """Crash recovery: find interrupted Claude Code sessions that need attention.
@@ -518,8 +611,11 @@ def boot_up(hours: int = 24) -> dict:
     crashed terminals, killed processes, laptop sleep/restart, etc.
     Returns a prioritized list scored by urgency (recency + dirty files).
 
+    Also scans project directories for dirty git state — repos with
+    uncommitted changes that may not have a matching session.
+
     Use after a reboot, crash, or "what was I working on?" moment.
-    Resume any session with: claude --resume <id>
+    Resume any session with the resume_cmd provided in each result.
     """
     import subprocess
 
@@ -528,8 +624,9 @@ def boot_up(hours: int = 24) -> dict:
     cutoff = now - hours * 3600
     _LAMBDA = math.log(2) / (2 * 3600)  # 2-hour half-life (urgency, not search)
 
-    # 1. Find sessions modified within the window
-    recent = [s for s in find_all_sessions() if s["mtime"] >= cutoff]
+    # 1. Find all sessions; split into recent (time-windowed) and all (for repo discovery)
+    all_sessions = find_all_sessions()
+    recent = [s for s in all_sessions if s["mtime"] >= cutoff]
 
     # 2. Find currently running claude processes and extract session IDs
     running_ids = set()
@@ -562,10 +659,45 @@ def boot_up(hours: int = 24) -> dict:
             except (json.JSONDecodeError, OSError):
                 continue
 
-    # 4. Classify each session
+    # 4. Collect unique project directories for git scanning (ALL sessions — dirty doesn't age out)
+    project_dirs = set()
+    for s in all_sessions:
+        pd = s["project_dir"]
+        if pd and pd != str(Path.home()) and Path(pd).exists():
+            project_dirs.add(pd)
+
+    # 5. Scan repos for dirty git state (parallel, with timeout budget)
+    dirty_repos = {}
+    repo_scan_results = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_scan_repo_git, pd): pd for pd in project_dirs}
+        for future in futures:
+            try:
+                result = future.result(timeout=10)
+                pd = futures[future]
+                repo_scan_results[pd] = result
+                if result and result["dirty"]:
+                    dirty_repos[pd] = result
+            except Exception:
+                continue
+
+    # 6. Classify each session
+    #    Use recent sessions as the base, but also pull in the MOST RECENT
+    #    session per dirty repo that isn't already in the window.
+    #    Dirty state doesn't age out, but we only need one session per repo.
+    candidates = {s["session_id"]: s for s in recent}
+    dirty_repo_best: dict[str, dict] = {}  # project_dir -> most recent session
+    for s in all_sessions:
+        pd = s["project_dir"]
+        if pd in dirty_repos and s["session_id"] not in candidates:
+            if pd not in dirty_repo_best or s["mtime"] > dirty_repo_best[pd]["mtime"]:
+                dirty_repo_best[pd] = s
+    for s in dirty_repo_best.values():
+        candidates[s["session_id"]] = s
+
     sessions = []
-    for s in recent:
-        sid = s["session_id"]
+    session_project_dirs = set()  # track which repos have sessions
+    for sid, s in candidates.items():
 
         # Skip currently running sessions
         if sid in running_ids:
@@ -574,18 +706,18 @@ def boot_up(hours: int = 24) -> dict:
         bookmark = bookmarks.get(sid)
         lifecycle = bookmark.get("lifecycle_state", "") if bookmark else ""
 
-        # Clean exits — skip
-        if lifecycle in ("done", "paused", "blocked", "handing-off"):
+        # Clean exits — skip (UNLESS the repo is still dirty)
+        repo_is_dirty = s["project_dir"] in dirty_repos
+        if lifecycle in ("done", "paused", "blocked", "handing-off") and not repo_is_dirty:
             continue
 
-        # Only recent sessions are plausible crash candidates.
-        # Old sessions without bookmarks predate the bookmark system.
-        # Old auto-closed sessions were already dealt with.
+        # Age filters: bypass if repo is dirty — uncommitted work doesn't age out
         age_h = (now - s["mtime"]) / 3600
-        if not bookmark and age_h > 6:
-            continue
-        if lifecycle == "auto-closed" and age_h > 12:
-            continue
+        if not repo_is_dirty:
+            if not bookmark and age_h > 6:
+                continue
+            if lifecycle == "auto-closed" and age_h > 12:
+                continue
 
         # What's left: recent auto-closed, or recent no-bookmark
         ws = bookmark.get("workspace_state", {}) if bookmark else {}
@@ -599,24 +731,58 @@ def boot_up(hours: int = 24) -> dict:
         if not context_summary and bookmark:
             context_summary = bookmark.get("context", {}).get("summary", "")
 
-        # Urgency score: exponential decay (2h half-life) + dirty file boost
+        # For sessions with no summary at all, extract last user message
+        if not context_summary:
+            last_msg = _extract_last_user_message(s["file"])
+            if last_msg:
+                context_summary = f"Last message: {last_msg}"
+            else:
+                context_summary = "Session closed without explicit bookmark"
+
+        # Enrich with live git state if available
+        repo_state = repo_scan_results.get(s["project_dir"])
+        if repo_state and repo_state["dirty"] and not dirty:
+            dirty = True
+            uncommitted = repo_state["dirty_files"][:10]
+        if repo_state and not branch:
+            branch = repo_state.get("branch", "")
+        if repo_state and not last_commit and repo_state.get("recent_commits"):
+            last_commit = repo_state["recent_commits"][0]
+
+        # Urgency score: session recency + repo dirty urgency
+        # Repo dirty urgency = file count + recency of dirty files (same formula as dirty_repos tool)
         age_s = max(now - s["mtime"], 0)
         time_score = math.exp(-_LAMBDA * age_s)
-        dirty_boost = 0.2 if dirty else 0
-        file_boost = min(0.15, len(uncommitted) * 0.03) if uncommitted else 0
-        score = time_score + dirty_boost + file_boost
+
+        repo_urgency = 0.0
+        if repo_state and repo_state["dirty"]:
+            file_score = min(repo_state.get("dirty_file_count", len(repo_state["dirty_files"])) / 15, 1.0)
+            dirty_age = max(now - repo_state["latest_dirty_mtime"], 0) if repo_state.get("latest_dirty_mtime") else now
+            dirty_recency = math.exp(-math.log(2) / (24 * 3600) * dirty_age)
+            repo_urgency = 0.5 * file_score + 0.5 * dirty_recency
+
+        score = time_score + repo_urgency
 
         state = "crashed" if not bookmark else "interrupted"
         if lifecycle == "auto-closed":
             state = "auto-closed"
 
+        # Filter noise: ~ home sessions with no context and no dirty files
+        project_short = shorten_path(s["project_dir"])
+        if project_short == "~" and not dirty and "Last message:" not in context_summary:
+            if context_summary == "Session closed without explicit bookmark":
+                continue
+
+        session_project_dirs.add(s["project_dir"])
+
         row = {
             "id": sid,
-            "project": shorten_path(s["project_dir"]),
+            "project": project_short,
             "date": datetime.fromtimestamp(s["mtime"]).strftime("%Y-%m-%d %H:%M"),
             "state": state,
             "summary": _trunc(context_summary, 100),
             "score": round(score, 3),
+            "resume_cmd": f"cd {project_short} && claude --resume {sid}",
         }
         if dirty:
             row["dirty"] = True
@@ -631,11 +797,86 @@ def boot_up(hours: int = 24) -> dict:
     # Sort by urgency score descending
     sessions.sort(key=lambda x: x["score"], reverse=True)
 
+    # 7. Build the full dirty repos list — this is the "what needs attention" view.
+    #    Dirty doesn't age out. This list only shrinks by committing.
+    all_dirty = []
+    for pd, repo_info in sorted(
+        dirty_repos.items(),
+        key=lambda x: len(x[1]["dirty_files"]),
+        reverse=True,
+    ):
+        entry = dict(repo_info)
+        entry["has_recent_session"] = pd in session_project_dirs
+        all_dirty.append(entry)
+
+    # 8. Negative space: what we checked
+    scan_report = {
+        "repos_scanned": len(repo_scan_results),
+        "repos_dirty": len(dirty_repos),
+        "repos_clean": len(repo_scan_results) - len(dirty_repos),
+        "repos_with_sessions": len(session_project_dirs),
+    }
+
     return {
         "total": len(sessions),
         "running": len(running_ids),
         "checked": len(recent),
         "sessions": sessions[:15],
+        "dirty_repos": all_dirty,
+        "scan_report": scan_report,
+    }
+
+
+@mcp.tool()
+def dirty_repos() -> dict:
+    """List all repos with uncommitted changes — your standing to-do list.
+
+    Scans every project directory Claude Code has ever touched for dirty
+    git state. This list only shrinks by committing. Sorted by number
+    of dirty files descending.
+    """
+    all_sessions = find_all_sessions()
+
+    # Collect all unique project directories (no time window — dirty doesn't age out)
+    project_dirs = set()
+    for s in all_sessions:
+        pd = s["project_dir"]
+        if pd and pd != str(Path.home()) and Path(pd).exists():
+            project_dirs.add(pd)
+
+    # Scan in parallel
+    dirty = []
+    clean = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_scan_repo_git, pd): pd for pd in project_dirs}
+        for future in futures:
+            try:
+                result = future.result(timeout=10)
+                if result and result["dirty"]:
+                    dirty.append(result)
+                elif result:
+                    clean.append(result["path"])
+            except Exception:
+                continue
+
+    # Score: file count (normalized) + recency (exponential decay, 24h half-life)
+    # More dirty files + more recent changes = higher urgency
+    now = time.time()
+    _DIRTY_LAMBDA = math.log(2) / (24 * 3600)  # 24-hour half-life
+    max_files = max((len(d["dirty_files"]) for d in dirty), default=1)
+    for d in dirty:
+        file_score = len(d["dirty_files"]) / max_files  # 0-1
+        age_s = max(now - d["latest_dirty_mtime"], 0) if d["latest_dirty_mtime"] else now
+        recency_score = math.exp(-_DIRTY_LAMBDA * age_s)  # 0-1
+        d["urgency"] = round(0.5 * file_score + 0.5 * recency_score, 3)
+
+    dirty.sort(key=lambda x: x["urgency"], reverse=True)
+
+    return {
+        "dirty": dirty,
+        "dirty_count": len(dirty),
+        "clean_count": len(clean),
+        "total_scanned": len(dirty) + len(clean),
     }
 
 
