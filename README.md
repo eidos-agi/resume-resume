@@ -8,11 +8,14 @@
 
 | | |
 |---|---|
-| **Resume** | Ask resume-resume to find old programming sessions in plain English, and pick up where you left off. |
-| **Prioritize** | resume-resume auto-ranks your past chats based on recency and incomplete worktrees, so you don't leave important work unfinished or uncommitted. |
-| **Speed** | resume-resume uses parallelized search to look through gigabytes of past chats in seconds. |
-| **Cost Savings** | resume-resume uses Haiku (smallest Claude model) to summarize past context once, then caches it permanently — so after the first run, searching thousands of sessions costs nothing. |
-| **Merge** | Ask resume-resume to merge multiple old chats together, pulling your thoughts across sessions into a single conversation. |
+| | |
+| **Resume** | Find old programming sessions in plain English and pick up where you left off. |
+| **Dirty Repos** | See every repo with uncommitted changes across your entire machine — your standing to-do list. Scored by file count and recency. |
+| **Crash Recovery** | `boot_up` finds interrupted sessions AND scans all repos for dirty git state. Ready-to-paste resume commands. |
+| **Prioritize** | Auto-ranks sessions and repos by urgency — dirty files don't age out, recent active work surfaces first. |
+| **Speed** | Parallelized BM25 search across gigabytes of past chats in seconds. Parallel git status scans across 50+ repos. |
+| **Cost Savings** | Uses Haiku to summarize past context once, then caches permanently — searching thousands of sessions costs nothing after first run. |
+| **Merge** | Merge multiple old chats together, pulling context across sessions into a single conversation. |
 
 ---
 
@@ -63,8 +66,9 @@ Two sessions — one about eidos-philosophy doc changes (Mar 14) and one with a 
 
 | Tool | What it does |
 |------|-------------|
-| `boot_up(hours)` | Crash recovery — finds sessions that didn't exit cleanly, scored by urgency |
-| `search_sessions(query)` | Full-text search across 5,000+ sessions in ~3s, ranked by RRF |
+| `boot_up(hours)` | Crash recovery — finds interrupted sessions + scans all repos for dirty git state. Scores by urgency (session recency + dirty file count + dirty file recency). Includes ready-to-paste `resume_cmd` for each result. |
+| `dirty_repos()` | Standing inventory of every repo with uncommitted changes. No time window — only shrinks by committing. Sorted by urgency score. |
+| `search_sessions(query)` | Full-text search across 5,000+ sessions in ~3s, ranked by BM25 |
 | `recent_sessions(hours)` | List recently active sessions |
 | `read_session(id, keyword)` | Read actual messages from a session, with optional keyword filter |
 | `session_summary(id)` | AI summary — cached instantly, generated in ~15s if not |
@@ -109,10 +113,13 @@ Requires Python 3.11+ and [Claude Code](https://docs.anthropic.com/en/docs/claud
 ## How It Works
 
 1. Scans `~/.claude/projects/` for JSONL session files
-2. Scores each by interruption severity — crashed mid-tool-use sessions first, lifecycle-aware for bookmarked ones
-3. Summarizes via `claude -p` with Haiku, cached permanently after first run
-4. Classifies sessions as human or automated using a gradient boosting model trained on 3,800 sessions — bot sessions hidden by default
-5. Surfaces bookmark data (lifecycle badges, next actions, blockers) when present
+2. Scans all project directories for dirty git state (parallel `git status --porcelain`)
+3. Scores sessions by urgency: session recency (2h half-life) + repo dirty urgency (file count + dirty file recency)
+4. Dirty repos bypass age filters — uncommitted work doesn't age out
+5. Summarizes via `claude -p` with Haiku, cached permanently after first run
+6. Classifies sessions as human or automated using a gradient boosting model trained on 3,800 sessions — bot sessions hidden by default
+7. Surfaces bookmark data (lifecycle badges, next actions, blockers) when present
+8. Reports negative space — how many repos were scanned, how many were clean vs dirty
 
 Run `/bookmark` inside any Claude Code session to capture lifecycle state (`done`, `paused`, `blocked`, `handoff`) before closing. An auto-bookmark Stop hook captures minimal state when you don't.
 
