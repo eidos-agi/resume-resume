@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-25
+
+### Added
+- New `dirty_repos` MCP tool — scans all repos for uncommitted changes, sorted by urgency score (file count + recency of dirty files). No time window — only shrinks by committing.
+- boot_up now scans all project directories for dirty git state in parallel
+- Dirty repos bypass session age filters — uncommitted work doesn't age out
+- Repo dirty urgency score flows into boot_up session scoring
+- Ready-to-paste `resume_cmd` in every boot_up session row
+- Last user message extraction for sessions with no cached summary
+- Noise filtering — suppresses blank home directory sessions
+- Negative space scan report (repos scanned/dirty/clean)
+
+### Changed
+- Replaced RRF scoring with BM25 summary-first search
+- Renamed package from claude_resume to resume_resume
+- Origin-aware session summaries
+
 ## [0.1.9] - 2026-03-22
 
 ### Fixed

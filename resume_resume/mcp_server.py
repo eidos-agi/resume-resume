@@ -1502,9 +1502,12 @@ def _trace_merges(session_file: Path, chain: list, visited: set) -> None:
             _trace_merges(s["file"], chain, visited)
 
 
-# Register data science tools on the same MCP instance
-from .data_science.mcp_tools import register_tools as _register_ds_tools
-_register_ds_tools(mcp)
+# Register data science tools on the same MCP instance (optional — requires scipy/sklearn)
+try:
+    from .data_science.mcp_tools import register_tools as _register_ds_tools
+    _register_ds_tools(mcp)
+except ImportError:
+    pass
 
 
 
