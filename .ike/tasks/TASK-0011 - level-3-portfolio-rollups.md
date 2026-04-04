@@ -10,10 +10,12 @@ tags:
 dependencies:
   - Validate L2 from consumer projects + re-run benchmark
 visionlog_goal_id: GOAL-013
-updated: '2026-03-30'
+updated: '2026-03-31'
 ---
 Same pattern as L2, one level up. Feed L2 project summaries to claude -p: "Summarize active projects across this portfolio. What's moving, what's stalled, what needs attention?"
 
 Trigger: daily or on-demand. Store in summary_levels with level=3. This powers cross-project views like "what did I work on this week?" and cockpit dashboards.
 
 Only build after L2 validation passes (TASK-0013).
+
+Correctly gated behind TASK-0013 (L2 validation). Do not start until MS-0001 ships and L2 is validated. L3 is the next milestone, not this one.

@@ -10,7 +10,8 @@ tags:
 dependencies:
   - Level 2 — Incremental project summary generator
 visionlog_goal_id: GOAL-013
-updated: '2026-03-30'
+updated: '2026-03-31'
+milestone: MS-0001
 ---
 Two-part validation per SOP-004:
 
@@ -19,3 +20,5 @@ Two-part validation per SOP-004:
 2. **Consumer validation:** Cold-start sessions in ciso and director-of-ai. Can the agent read a project summary and be immediately productive? Test: "What's the status of the Wrike renewal?" should be answerable from L2 without searching 5 sessions.
 
 If validation fails, adjust L2 generation before proceeding to L3.
+
+Linked to MS-0001. This is the quality gate — if L2 doesn't pass consumer validation, we fix it before shipping project_orient().

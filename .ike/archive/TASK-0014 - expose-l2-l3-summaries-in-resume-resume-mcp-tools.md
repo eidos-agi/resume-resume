@@ -11,6 +11,7 @@ tags:
 dependencies:
   - Level 2 — Incremental project summary generator
 visionlog_goal_id: GOAL-013
+updated: '2026-03-31'
 ---
 Add MCP tools to resume-resume that read from the new summary_levels table in commons:
 
@@ -20,3 +21,5 @@ Add MCP tools to resume-resume that read from the new summary_levels table in co
 - Update `merge_context` to prefer L2 summary over raw session merging when available
 
 These are thin wrappers over commons query functions. The intelligence is in commons; resume-resume just exposes it.
+
+**Archived:** Superseded by TASK-0015 (same scope — wire L2 into MCP — but with tighter DoD, acceptance criteria, and milestone assignment)

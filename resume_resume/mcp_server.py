@@ -28,6 +28,7 @@ from .sessions import (
 )
 from claude_session_commons import decode_project_path
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
+from .progress import progress
 
 mcp = FastMCP("resume-resume")
 
@@ -227,6 +228,11 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     all_sessions = find_all_sessions()
 
+    # Progress HUD — channel per search query
+    p_ctx = progress(f"search: {query}")
+    p = p_ctx.__enter__()
+    p.update(f"Searching {len(all_sessions)} sessions...", icon="search")
+
     # Bulk-load all cache files ONCE before the thread pool (~1KB each vs 1-5MB JSONL).
     cache_index: dict[str, dict] = {}
     if _cache._dir.exists():
@@ -240,6 +246,7 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     # Build corpus-level BM25 statistics (IDF, avg doc lengths)
     corpus = build_corpus_stats(cache_index)
+    p.update(f"BM25 index built, scanning...", icon="working")
 
     def _check(s):
         sid = s["session_id"]
@@ -281,11 +288,30 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         raw_len = len(raw)
         return (s, total_count, snippet, raw_len)
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        results = list(pool.map(_check, all_sessions))
+    # Stream progress as results come in — Perplexity-style
+    from concurrent.futures import as_completed
 
-    matches = [r for r in results if r is not None]
+    matches = []
+    total = len(all_sessions)
+    checked = 0
+    last_report = 0
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {pool.submit(_check, s): s for s in all_sessions}
+        for future in as_completed(futures):
+            checked += 1
+            result = future.result()
+            if result is not None:
+                matches.append(result)
+            # Report every ~15% or every 200 sessions
+            pct = int((checked / total) * 100)
+            if pct >= last_report + 15 or checked == total:
+                last_report = pct
+                p.update(f"{checked}/{total} scanned, {len(matches)} matches so far", icon="working")
+
+    p.update(f"{len(matches)} matches from {total} sessions", icon="done")
     if not matches:
+        p_ctx.__exit__(None, None, None)
         return []
 
     # BM25 scoring: summary-first with magnitude-based combination
@@ -304,6 +330,15 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     scored.sort(key=lambda x: x[3], reverse=True)
     scored = scored[:limit]
+
+    p.update(f"Top {len(scored)} results scored", icon="done", highlight=True)
+    for s, total_count, snippet, final, *_ in scored[:5]:
+        title = s.get("title", s.get("session_id", "")[:30])
+        proj = shorten_path(s.get("project", ""))
+        p.result(title, f"{proj} | score {final:.0f} | {total_count} hits",
+                 session_id=s.get("session_id", ""))
+    time.sleep(0.1)  # let socket flush before closing
+    p_ctx.__exit__(None, None, None)
 
     return [
         _session_row(s, {
@@ -624,9 +659,13 @@ def boot_up(hours: int = 24) -> dict:
     cutoff = now - hours * 3600
     _LAMBDA = math.log(2) / (2 * 3600)  # 2-hour half-life (urgency, not search)
 
+    p_ctx = progress("boot up")
+    p = p_ctx.__enter__()
+
     # 1. Find all sessions; split into recent (time-windowed) and all (for repo discovery)
     all_sessions = find_all_sessions()
     recent = [s for s in all_sessions if s["mtime"] >= cutoff]
+    p.update(f"{len(recent)} recent sessions (last {hours}h), {len(all_sessions)} total", icon="search")
 
     # 2. Find currently running claude processes and extract session IDs
     running_ids = set()
@@ -666,12 +705,23 @@ def boot_up(hours: int = 24) -> dict:
         if pd and pd != str(Path.home()) and Path(pd).exists():
             project_dirs.add(pd)
 
+    p.update(f"Scanning {len(project_dirs)} repos for dirty git state...", icon="working")
+
     # 5. Scan repos for dirty git state (parallel, with timeout budget)
+    from concurrent.futures import as_completed as _as_completed
     dirty_repos = {}
     repo_scan_results = {}
+    repo_total = len(project_dirs)
+    repo_checked = 0
+    repo_last_pct = 0
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(_scan_repo_git, pd): pd for pd in project_dirs}
-        for future in futures:
+        for future in _as_completed(futures, timeout=30):
+            repo_checked += 1
+            pct = int((repo_checked / repo_total) * 100) if repo_total else 100
+            if pct >= repo_last_pct + 20 or repo_checked == repo_total:
+                repo_last_pct = pct
+                p.update(f"Git: {repo_checked}/{repo_total} repos, {len(dirty_repos)} dirty", icon="working")
             try:
                 result = future.result(timeout=10)
                 pd = futures[future]
@@ -680,6 +730,8 @@ def boot_up(hours: int = 24) -> dict:
                     dirty_repos[pd] = result
             except Exception:
                 continue
+
+    p.update(f"{len(dirty_repos)} dirty repos found", icon="done")
 
     # 6. Classify each session
     #    Use recent sessions as the base, but also pull in the MOST RECENT
@@ -796,6 +848,9 @@ def boot_up(hours: int = 24) -> dict:
 
     # Sort by urgency score descending
     sessions.sort(key=lambda x: x["score"], reverse=True)
+    p.update(f"{len(sessions)} sessions need attention", icon="done", highlight=True)
+    for s in sessions[:5]:
+        p.result(s["summary"][:60], f"{s['project']} | {s['state']} | {s['date']}", session_id=s["id"])
 
     # 7. Build the full dirty repos list — this is the "what needs attention" view.
     #    Dirty doesn't age out. This list only shrinks by committing.
@@ -816,6 +871,8 @@ def boot_up(hours: int = 24) -> dict:
         "repos_clean": len(repo_scan_results) - len(dirty_repos),
         "repos_with_sessions": len(session_project_dirs),
     }
+
+    p_ctx.__exit__(None, None, None)
 
     return {
         "total": len(sessions),
@@ -1506,6 +1563,13 @@ def _trace_merges(session_file: Path, chain: list, visited: set) -> None:
 try:
     from .data_science.mcp_tools import register_tools as _register_ds_tools
     _register_ds_tools(mcp)
+except ImportError:
+    pass
+
+# Register L2/L3 project summary tools (requires insights.db from commons daemon)
+try:
+    from .l2_tools import register_l2_tools
+    register_l2_tools(mcp)
 except ImportError:
     pass
 
