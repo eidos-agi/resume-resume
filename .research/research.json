@@ -1,0 +1,35 @@
+{
+  "id": "9386d805-b79f-4fcf-bc3a-9030cb46218b",
+  "version": "0.1.0",
+  "projectName": "multi-level-ai-management",
+  "created": "2026-04-15",
+  "phase": "decided",
+  "transitions": [
+    {
+      "phase": "research",
+      "date": "2026-04-15"
+    },
+    {
+      "phase": "locked",
+      "date": "2026-04-15",
+      "note": "Criteria weights frozen"
+    },
+    {
+      "phase": "reviewed",
+      "date": "2026-04-15",
+      "note": "Peer review by Claude (self-review after user called out miscalibrated priors)"
+    },
+    {
+      "phase": "scored",
+      "date": "2026-04-15",
+      "note": "Scored candidate: a1-only-human-is-a2"
+    },
+    {
+      "phase": "decided",
+      "date": "2026-04-15",
+      "note": "Build the full A1+A2 stack now. A1 (product-improvement AI) reads telemetry, writes recommendations,"
+    }
+  ],
+  "question": "Should resume-resume build a multi-level autonomous AI management stack (A1 = product-improvement AI reads telemetry, A2 = process-management AI watches A1 and proposes methodology changes, human manages A2), or a lighter variant where the human manually performs A2's role for a calibration period, or defer entirely?",
+  "context": "resume-resume now has telemetry (per-MCP-call JSONL) and self_* introspection tools. User wants highest-leverage human role: managing a meta-AI that manages a product-improvement AI. Claude (advisor) expressed concerns: (1) A1's output must auto-apply for A2 to have real work, (2) A2's feedback loop is weeks long, (3) small surface area (~2k LOC, 23 tools), (4) infinite regress justification, (5) loss of product intuition. User counter: AI engineer wants to learn by building. Claude suggested: be A2 manually for 2 months, then automate once ground truth exists. User invoked trilogy (research.md earns decisions with evidence). Current state: recommendations.py + evaluator.py (= A1) already scaffolded uncommitted on working tree."
+}
