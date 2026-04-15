@@ -1646,26 +1646,80 @@ from . import meta_ai as _meta
 
 
 @mcp.tool()
-def self_run_a1(days: int = 30) -> dict:
-    """Invoke A1 — the product-improvement AI.
+def self_a1_file(
+    type: str,
+    title: str,
+    evidence: str,
+    confidence: float,
+    action_class: str = "queued",
+    target: str = "",
+    new_value: float | int | None = None,
+    suggested_action: str = "",
+) -> dict:
+    """File an A1 product recommendation. Called by the A1 skill.
 
-    Reads telemetry insights, drafts recommendations, auto-applies the
-    'auto' class (threshold tweaks only). Queued-class recommendations are
-    filed for A2 to observe. Uses `claude -p` (fixed cost).
+    Validates confidence against threshold, dedupes against recent entries,
+    auto-applies the 'auto' class when guardrails pass (tune + target in
+    tunable keys + numeric new_value), downgrades unsafe auto-requests to
+    queued. Returns the recorded record or a {skipped: <reason>} dict.
+
+    type: remove | optimize | tune | investigate | ship | other
+    action_class: "auto" | "queued"
     """
-    return _meta.run_a1(days=days)
+    return _meta.file_a1_recommendation(
+        type=type,
+        title=title,
+        evidence=evidence,
+        confidence=confidence,
+        action_class=action_class,
+        target=target,
+        new_value=new_value,
+        suggested_action=suggested_action,
+    )
 
 
 @mcp.tool()
-def self_run_a2(days: int = 30) -> dict:
-    """Invoke A2 — the process-management AI.
+def self_a2_file(
+    target: str,
+    change_type: str,
+    title: str,
+    evidence: str,
+    confidence: float,
+    diff: dict | str | None = None,
+    expected_effect: str = "",
+) -> dict:
+    """File an A2 process-management proposal. Called by the A2 skill.
 
-    Reads A1's prompt, A1's recent output, A1's auto-applied actions, and
-    A2's own prior verdicts. Drafts process proposals (prompt edits,
-    threshold changes, criterion adds/removes) that land in the human
-    inbox. Uses `claude -p` (fixed cost).
+    target: "a1_prompt" | "thresholds.json" | "cadence"
+    change_type: "prompt_edit" | "threshold_change" | "criterion_add"
+                 | "criterion_remove" | "authority_change" | "other"
+    diff: for prompt_edit → {"full_new_text": "..."}; for threshold_change
+          → {"key": "...", "from": X, "to": Y}; else descriptive string.
     """
-    return _meta.run_a2(days=days)
+    return _meta.file_a2_proposal(
+        target=target,
+        change_type=change_type,
+        title=title,
+        evidence=evidence,
+        confidence=confidence,
+        diff=diff,
+        expected_effect=expected_effect,
+    )
+
+
+@mcp.tool()
+def self_load_thresholds() -> dict:
+    """Current config/thresholds.json plus the list of keys A1 may auto-tune."""
+    return {
+        "thresholds": _meta.load_thresholds(),
+        "tunable_keys": sorted(_meta.TUNABLE_KEYS),
+    }
+
+
+@mcp.tool()
+def self_a1_prompt() -> str:
+    """Read A1's skill prompt (SKILL.md). A2 uses this to reason about prompt edits."""
+    return _meta.read_a1_prompt()
 
 
 @mcp.tool()
