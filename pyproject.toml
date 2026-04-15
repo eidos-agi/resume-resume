@@ -13,7 +13,7 @@ dependencies = [
     "claude-session-commons>=0.1.0",
     "textual>=0.40",
     "numpy",
-    "mcp>=1.0",
+    "fastmcp>=2.0",
 ]
 
 [project.optional-dependencies]

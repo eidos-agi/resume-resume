@@ -15,8 +15,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
+from .telemetry import TelemetryMiddleware
 from .sessions import (
     SessionCache,
     find_all_sessions,
@@ -31,6 +32,7 @@ from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_
 from .progress import progress
 
 mcp = FastMCP("resume-resume")
+mcp.add_middleware(TelemetryMiddleware())
 
 _cache = SessionCache()
 
