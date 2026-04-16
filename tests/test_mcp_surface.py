@@ -140,6 +140,61 @@ async def test_self_a2_scorecard_shape(client):
     assert isinstance(d["rows"], list)
 
 
+# ---------------------------------------------------------------------------
+# _extract_crash_context unit tests (TASK-0002)
+# ---------------------------------------------------------------------------
+
+def test_extract_crash_context_basic(tmp_path):
+    """Extracts last user msg, assistant msg, tool use, and count."""
+    import json as _json
+    from resume_resume.mcp_server import _extract_crash_context
+
+    session = tmp_path / "session.jsonl"
+    lines = [
+        _json.dumps({"type": "human", "timestamp": "2026-04-16T10:00:00Z",
+                     "message": {"content": "fix the login bug"}}),
+        _json.dumps({"type": "assistant", "timestamp": "2026-04-16T10:01:00Z",
+                     "message": {"content": [
+                         {"type": "text", "text": "I'll look at the auth module."},
+                         {"type": "tool_use", "name": "Read",
+                          "input": {"file_path": "/src/auth.py"}},
+                     ]}}),
+        _json.dumps({"type": "human", "timestamp": "2026-04-16T10:05:00Z",
+                     "message": {"content": "now check the tests"}}),
+        _json.dumps({"type": "assistant", "timestamp": "2026-04-16T10:06:00Z",
+                     "message": {"content": [
+                         {"type": "tool_use", "name": "Bash",
+                          "input": {"command": "pytest tests/test_auth.py"}},
+                         {"type": "text", "text": "Running the auth tests now."},
+                     ]}}),
+    ]
+    session.write_text("\n".join(lines))
+
+    ctx = _extract_crash_context(session)
+    assert ctx["last_user_msg"] == "now check the tests"
+    assert "auth tests" in ctx["last_assistant_msg"]
+    assert ctx["last_tool"].startswith("Bash:")
+    assert "pytest" in ctx["last_tool"]
+    assert ctx["message_count"] == 4
+    assert ctx["duration_estimate"]  # should be "6m" or similar
+
+
+def test_extract_crash_context_empty_file(tmp_path):
+    session = tmp_path / "empty.jsonl"
+    session.write_text("")
+    from resume_resume.mcp_server import _extract_crash_context
+    ctx = _extract_crash_context(session)
+    assert ctx["last_user_msg"] == ""
+    assert ctx["message_count"] == 0
+
+
+def test_extract_crash_context_missing_file(tmp_path):
+    from resume_resume.mcp_server import _extract_crash_context
+    ctx = _extract_crash_context(tmp_path / "nonexistent.jsonl")
+    assert ctx["last_user_msg"] == ""
+    assert ctx["message_count"] == 0
+
+
 @pytest.mark.asyncio
 async def test_dirty_repos_shape(client):
     r = await client.call_tool("dirty_repos", {})

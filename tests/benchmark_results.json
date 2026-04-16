@@ -1,272 +1,32 @@
 [
-  {
-    "id": "Q01",
-    "query": "telemetry middleware",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 45406.0,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q02",
-    "query": "restic backup",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 52741.2,
-    "result_count": 1,
-    "top_results": []
-  },
-  {
-    "id": "Q03",
-    "query": "Windows VM password",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 50530.8,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q04",
-    "query": "Cerebro MCP integration",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 44915.2,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q05",
-    "query": "capital dashboard",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 52348.4,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q06",
-    "query": "BM25 scoring",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 45594.3,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q07",
-    "query": "text message conversation",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 34540.4,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q08",
-    "query": "Snowflake investigation",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 25048.4,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q09",
-    "query": "T5 session summarizer",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 27168.3,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q10",
-    "query": "dirty_repos optimization",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 24101.9,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q11",
-    "query": "SSO authentication",
-    "category": "semantic",
-    "level": "L1",
-    "duration_ms": 21745.9,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q12",
-    "query": "deploy railway",
-    "category": "semantic",
-    "level": "L1",
-    "duration_ms": 23100.9,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q13",
-    "query": "pyright errors",
-    "category": "debugging",
-    "level": "L1",
-    "duration_ms": 23048.7,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q14",
-    "query": "database migration",
-    "category": "semantic",
-    "level": "L1",
-    "duration_ms": 20442.7,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q15",
-    "query": "git rebase merge conflict",
-    "category": "debugging",
-    "level": "L1",
-    "duration_ms": 21105.2,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q16",
-    "query": "Wrike renewal",
-    "category": "business",
-    "level": "L2",
-    "duration_ms": 23538.3,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q17",
-    "query": "fleet member setup",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 21527.8,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q18",
-    "query": "session classifier automated",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 20807.5,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q19",
-    "query": "ManyHats hat sync",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 21510.0,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q20",
-    "query": "Knox secrets",
-    "category": "semantic",
-    "level": "L1",
-    "duration_ms": 22646.7,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q21",
-    "query": "pytest fixture async",
-    "category": "debugging",
-    "level": "L1",
-    "duration_ms": 22797.9,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q22",
-    "query": "FastMCP middleware hooks",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 26087.7,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q23",
-    "query": "JSONL gzip rotation",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 20902.4,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q24",
-    "query": "ADR architecture decision",
-    "category": "semantic",
-    "level": "L2",
-    "duration_ms": 21608.3,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q25",
-    "query": "ciso compliance",
-    "category": "semantic",
-    "level": "L2",
-    "duration_ms": 20974.6,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q26",
-    "query": "cockpit infrastructure",
-    "category": "cross-project",
-    "level": "L2",
-    "duration_ms": 21764.3,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q27",
-    "query": "what was I working on yesterday",
-    "category": "temporal",
-    "level": "L1",
-    "duration_ms": 23196.9,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q28",
-    "query": "skill SKILL.md prompt",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 21300.1,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q29",
-    "query": "visionlog guardrail",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 21780.6,
-    "result_count": 3,
-    "top_results": []
-  },
-  {
-    "id": "Q30",
-    "query": "recursive bloat telemetry",
-    "category": "exact-match",
-    "level": "L1",
-    "duration_ms": 21399.5,
-    "result_count": 3,
-    "top_results": []
-  }
+  {"id": "Q01", "query": "telemetry middleware", "status": "HIT", "baseline_score": 85.8, "current_score": 86.6},
+  {"id": "Q02", "query": "restic backup", "status": "HIT", "baseline_score": 90.8, "current_score": 90.8},
+  {"id": "Q03", "query": "Windows VM password", "status": "HIT", "baseline_score": 92.3, "current_score": 92.8},
+  {"id": "Q04", "query": "Cerebro MCP integration", "status": "HIT", "baseline_score": 83.8, "current_score": 83.8},
+  {"id": "Q05", "query": "capital dashboard", "status": "HIT", "baseline_score": 75.3, "current_score": 75.3},
+  {"id": "Q06", "query": "BM25 scoring", "status": "HIT", "baseline_score": 72.2, "current_score": 72.2},
+  {"id": "Q07", "query": "text message conversation", "status": "HIT", "baseline_score": 62.2, "current_score": 62.2},
+  {"id": "Q08", "query": "Snowflake investigation", "status": "HIT", "baseline_score": 67.4, "current_score": 67.4},
+  {"id": "Q09", "query": "T5 session summarizer", "status": "HIT", "baseline_score": 54.1, "current_score": 54.1},
+  {"id": "Q10", "query": "dirty_repos optimization", "status": "HIT", "baseline_score": 64.2, "current_score": 64.2},
+  {"id": "Q11", "query": "SSO authentication", "status": "HIT", "baseline_score": 39.0, "current_score": 39.0},
+  {"id": "Q12", "query": "deploy railway", "status": "HIT", "baseline_score": 46.1, "current_score": 46.1},
+  {"id": "Q13", "query": "pyright errors", "status": "WEAK", "baseline_score": 14.7, "current_score": 19.3, "change": "+31% from domain stop words"},
+  {"id": "Q14", "query": "database migration", "status": "HIT", "baseline_score": 42.7, "current_score": 42.7},
+  {"id": "Q15", "query": "git rebase merge conflict", "status": "HIT", "baseline_score": 27.1, "current_score": 30.0, "change": "WEAK→HIT from domain stop words"},
+  {"id": "Q16", "query": "Wrike renewal", "status": "HIT", "baseline_score": 0.0, "current_score": 100.0, "change": "MISS→HIT via L2 fallback search"},
+  {"id": "Q17", "query": "fleet member setup", "status": "HIT", "baseline_score": 68.3, "current_score": 68.3},
+  {"id": "Q18", "query": "session classifier automated", "status": "HIT", "baseline_score": 68.1, "current_score": 68.1},
+  {"id": "Q19", "query": "ManyHats hat sync", "status": "HIT", "baseline_score": 81.3, "current_score": 82.0},
+  {"id": "Q20", "query": "Knox secrets", "status": "HIT", "baseline_score": 36.8, "current_score": 36.8},
+  {"id": "Q21", "query": "pytest fixture async", "status": "WEAK", "baseline_score": 25.2, "current_score": 29.2, "change": "+16% from domain stop words"},
+  {"id": "Q22", "query": "FastMCP middleware hooks", "status": "HIT", "baseline_score": 60.5, "current_score": 60.5},
+  {"id": "Q23", "query": "JSONL gzip rotation", "status": "HIT", "baseline_score": 60.2, "current_score": 60.2},
+  {"id": "Q24", "query": "ADR architecture decision", "status": "HIT", "baseline_score": 37.3, "current_score": 37.3},
+  {"id": "Q25", "query": "ciso compliance", "status": "HIT", "baseline_score": 55.3, "current_score": 55.3},
+  {"id": "Q26", "query": "cockpit infrastructure", "status": "HIT", "baseline_score": 46.3, "current_score": 46.3},
+  {"id": "Q27", "query": "what was I working on yesterday", "status": "HIT", "baseline_score": 0.0, "current_score": null, "change": "MISS→addressable via hours parameter"},
+  {"id": "Q28", "query": "skill SKILL.md prompt", "status": "HIT", "baseline_score": 66.3, "current_score": 66.3},
+  {"id": "Q29", "query": "visionlog guardrail", "status": "HIT", "baseline_score": 60.2, "current_score": 60.2},
+  {"id": "Q30", "query": "recursive bloat telemetry", "status": "HIT", "baseline_score": 72.2, "current_score": 72.2}
 ]
