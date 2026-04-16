@@ -62,15 +62,12 @@ async def test_self_a1_prompt_returns_string(client):
 
 @pytest.mark.asyncio
 async def test_self_process_decide_rejects_bad_id(client):
-    r = await client.call_tool("self_process_decide", {
-        "proposal_id": "nonexistent",
-        "verdict": "approved",
-    })
-    # fastmcp wraps ValueError as is_error=True or includes error text
-    err_text = str(r.data).lower() if r.data else ""
-    assert r.is_error or "error" in err_text or "no proposal" in err_text or "valueerror" in err_text, (
-        f"Expected error for nonexistent proposal_id, got is_error={r.is_error} data={r.data}"
-    )
+    from fastmcp.exceptions import ToolError
+    with pytest.raises(ToolError, match="no proposal"):
+        await client.call_tool("self_process_decide", {
+            "proposal_id": "nonexistent",
+            "verdict": "approved",
+        })
 
 
 @pytest.mark.asyncio
@@ -130,6 +127,18 @@ async def test_list_tool_returns_items_count(client, tool, args):
 # ---------------------------------------------------------------------------
 # Core tools — basic smoke (not self_*, but critical path)
 # ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_self_a2_scorecard_shape(client):
+    r = await client.call_tool("self_a2_scorecard", {"days": 90})
+    d = r.data
+    assert isinstance(d, dict)
+    assert "proposals_approved" in d
+    assert "proposals_with_after_data" in d
+    assert "rows" in d
+    assert "summary" in d
+    assert isinstance(d["rows"], list)
+
 
 @pytest.mark.asyncio
 async def test_dirty_repos_shape(client):
