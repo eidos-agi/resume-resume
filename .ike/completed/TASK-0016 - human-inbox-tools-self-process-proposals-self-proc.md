@@ -1,7 +1,7 @@
 ---
 id: TASK-0016
 title: 'Human inbox tools: self_process_proposals, self_process_decide'
-status: To Do
+status: Done
 created: '2026-04-15'
 priority: high
 tags:
