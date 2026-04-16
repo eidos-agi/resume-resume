@@ -1,7 +1,7 @@
 ---
 id: TASK-0002
 title: 'boot_up: extract richer context from crashed sessions'
-status: In Progress
+status: Done
 created: '2026-03-25'
 priority: low
 tags:
@@ -20,3 +20,5 @@ Improve by extracting from the JSONL tail:
 This gives enough context to decide whether a crashed session is worth resuming without having to read_session first.
 
 Deprioritized — project_orient() (TASK-0016) will provide richer context for all sessions including crashed ones. This becomes a nice-to-have polish task after MS-0001 ships.
+
+**Completion notes:** Shipped in 28d71cf. boot_up now shows last_claude_said, last_tool, message_count, and duration for crashed sessions. Extracts from JSONL tail (last 50KB).

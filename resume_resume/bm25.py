@@ -29,13 +29,27 @@ W_RECENCY = 0.15
 HALF_LIFE_DAYS = 30
 _LAMBDA = math.log(2) / (HALF_LIFE_DAYS * 86400)
 
-# Stop words to skip in BM25 (common words that add noise)
+# Stop words to skip in BM25 (common words that add noise).
+# Includes English stop words + dev-domain terms that appear in nearly
+# every Claude Code session and never carry search signal. Adding these
+# was motivated by benchmark queries Q13/Q15/Q21 scoring WEAK because
+# generic dev terms diluted IDF for the distinctive terms in the query.
 _STOP_WORDS = frozenset({
+    # English
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
     "of", "with", "by", "from", "is", "it", "was", "be", "are", "were",
     "been", "has", "had", "do", "did", "will", "would", "could", "should",
     "not", "no", "this", "that", "these", "those", "i", "you", "we", "he",
     "she", "they", "my", "your", "our", "his", "her", "its", "their",
+    # Dev-domain: appear in >80% of sessions, never search-distinctive
+    "file", "files", "code", "run", "use", "using", "set", "get", "new",
+    "add", "just", "like", "also", "can", "one", "now", "here", "want",
+    "need", "make", "way", "see", "so", "if", "then", "else", "try",
+    "let", "ll", "re", "ve", "don", "doesn", "didn", "won", "isn",
+    # Code/JSON literals (appear in every tool output)
+    "true", "false", "null", "none", "return", "def", "class", "import",
+    # Tool output noise
+    "line", "lines", "output", "input", "result", "value", "type", "name",
 })
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
