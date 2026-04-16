@@ -428,3 +428,77 @@ def read_a1_prompt() -> str:
         return A1_SKILL_FILE.read_text(encoding="utf-8")
     except OSError:
         return ""
+
+
+# ---------------------------------------------------------------------------
+# Outcome tracking — TASK-0017
+# ---------------------------------------------------------------------------
+
+def a2_scorecard(days: int = 90) -> dict:
+    """Score A2's effectiveness: for each approved proposal, what happened
+    to A1's output and telemetry metrics before vs after?
+
+    Approach: for each approved proposal, compare A1 output filed BEFORE
+    the proposal's decided_at vs AFTER. Count A1 recommendations, auto-apply
+    rate, error rate. The human judges whether the trend is positive.
+
+    Returns a dict with per-proposal rows + aggregate stats.
+    """
+    decided = proposal_history(limit=200)
+    approved = [p for p in decided if p.get("state") == "approved"]
+    if not approved:
+        return {
+            "proposals_approved": 0,
+            "proposals_with_after_data": 0,
+            "rows": [],
+            "summary": "No approved proposals yet — nothing to score.",
+        }
+
+    all_a1 = list(_iter(_a1_log()))
+    rows = []
+    for p in approved:
+        decided_at = p.get("decided_at") or p.get("applied_at") or ""
+        if not decided_at:
+            continue
+
+        # Split A1 output into before/after this proposal
+        before = [r for r in all_a1 if (r.get("created_at") or "") < decided_at]
+        after = [r for r in all_a1 if (r.get("created_at") or "") >= decided_at]
+
+        def _stats(recs: list[dict]) -> dict:
+            if not recs:
+                return {"count": 0, "auto_applied": 0, "queued": 0, "avg_confidence": 0.0}
+            auto = sum(1 for r in recs if r.get("state") == "auto_applied")
+            queued = sum(1 for r in recs if r.get("action_class") == "queued")
+            confs = [r.get("confidence") or 0.0 for r in recs]
+            return {
+                "count": len(recs),
+                "auto_applied": auto,
+                "queued": queued,
+                "avg_confidence": round(sum(confs) / len(confs), 3),
+            }
+
+        rows.append({
+            "proposal_id": p.get("id"),
+            "title": p.get("title"),
+            "target": p.get("target"),
+            "decided_at": decided_at,
+            "expected_effect": p.get("expected_effect") or "",
+            "apply_error": p.get("apply_error"),
+            "a1_before": _stats(before),
+            "a1_after": _stats(after),
+            "has_after_data": len(after) > 0,
+        })
+
+    with_data = sum(1 for r in rows if r["has_after_data"])
+
+    return {
+        "proposals_approved": len(approved),
+        "proposals_with_after_data": with_data,
+        "rows": rows,
+        "summary": (
+            f"{len(approved)} proposals approved, "
+            f"{with_data} have post-approval A1 output to compare. "
+            f"Review the before/after stats per row to judge A2's effectiveness."
+        ),
+    }

@@ -72,3 +72,15 @@ Report to the user in 3–5 lines:
 - Whether you noticed any product issues that are A1's job to file, not yours
 
 Then stop.
+
+## Scheduling
+
+A2 is designed to run bi-weekly (every other Friday), or on-demand. To automate:
+- `/schedule` in Claude Code to create a recurring trigger, or
+- `claude schedule create --name "a2-biweekly" --cron "0 9 */14 * 5" --prompt "/a2"` from the terminal.
+
+Also consider running A2 after A1 has produced >=5 new recommendations since the last A2 run.
+
+## Scorecard
+
+After running, suggest the human check `self_a2_scorecard` to see whether your past approved proposals actually improved A1's output. This is your own feedback loop — if your proposals aren't helping, recalibrate.

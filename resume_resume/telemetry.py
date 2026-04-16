@@ -80,7 +80,8 @@ def _jsonable(obj: Any) -> Any:
 def write_event(event: dict, *, path: Path | None = None) -> None:
     """Append a telemetry event to today's per-user JSONL file.
 
-    Never raises — telemetry must not break the MCP server.
+    Also runs lightweight maintenance: gzips old files on the first write
+    of the day. Never raises — telemetry must not break the MCP server.
     """
     try:
         target = path or _today_path()
@@ -88,6 +89,74 @@ def write_event(event: dict, *, path: Path | None = None) -> None:
         line = json.dumps(event, default=str, ensure_ascii=False)
         with target.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
+        # Lightweight maintenance — gzip + retention on first write of the day
+        _maybe_rotate(target.parent)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Rotation: gzip files older than 7 days, delete beyond retention limit
+# ---------------------------------------------------------------------------
+
+_GZIP_AFTER_DAYS = 7
+_ROTATE_SENTINEL: set[str] = set()  # per-process, per-directory dedup
+
+
+def _maybe_rotate(root: Path) -> None:
+    """Gzip .jsonl files older than 7 days. Delete beyond retention limit.
+
+    Runs at most once per process per directory (sentinel set).
+    Retention: controlled by RESUME_RESUME_TELEMETRY_RETENTION_DAYS env var.
+    Default: no deletion (only gzip). Set to e.g. 90 to delete files older
+    than 90 days.
+    """
+    import gzip as _gzip
+
+    key = str(root)
+    if key in _ROTATE_SENTINEL:
+        return
+    _ROTATE_SENTINEL.add(key)
+
+    try:
+        today = datetime.now(timezone.utc).date()
+        retention_days = int(os.environ.get("RESUME_RESUME_TELEMETRY_RETENTION_DAYS", "0"))
+
+        for f in sorted(root.glob("*.jsonl")):
+            try:
+                file_date_str = f.stem  # YYYY-MM-DD
+                from datetime import date as _date
+                file_date = _date.fromisoformat(file_date_str)
+                age_days = (today - file_date).days
+            except (ValueError, TypeError):
+                continue
+
+            # Gzip old raw files
+            if age_days >= _GZIP_AFTER_DAYS:
+                gz_path = f.with_suffix(".jsonl.gz")
+                if not gz_path.exists():
+                    try:
+                        with f.open("rb") as src, _gzip.open(gz_path, "wb") as dst:
+                            dst.writelines(src)
+                        f.unlink()
+                    except OSError:
+                        continue
+                else:
+                    # gz already exists, remove the raw
+                    f.unlink()
+
+        # Retention: delete old .jsonl.gz files beyond limit
+        if retention_days > 0:
+            for f in sorted(root.glob("*.jsonl.gz")):
+                try:
+                    file_date_str = f.stem.replace(".jsonl", "")
+                    from datetime import date as _date
+                    file_date = _date.fromisoformat(file_date_str)
+                    age_days = (today - file_date).days
+                except (ValueError, TypeError):
+                    continue
+                if age_days > retention_days:
+                    f.unlink()
     except Exception:
         pass
 

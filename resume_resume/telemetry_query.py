@@ -19,26 +19,44 @@ from .telemetry import telemetry_root
 
 
 def _day_files(root: Path, days: int) -> list[Path]:
-    """Return telemetry file paths for the last `days` days (today first)."""
+    """Return telemetry file paths for the last `days` days (today first).
+
+    Checks for both raw .jsonl and gzipped .jsonl.gz — rotation may have
+    compressed older files.
+    """
     today = datetime.now(timezone.utc).date()
     out = []
     for i in range(days):
         d = today - timedelta(days=i)
-        p = root / f"{d.isoformat()}.jsonl"
-        if p.exists():
-            out.append(p)
+        raw = root / f"{d.isoformat()}.jsonl"
+        gz = root / f"{d.isoformat()}.jsonl.gz"
+        if raw.exists():
+            out.append(raw)
+        elif gz.exists():
+            out.append(gz)
     return out
+
+
+def _open_jsonl(path: Path):
+    """Open a .jsonl or .jsonl.gz file for text reading."""
+    import gzip
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8")
+    return path.open("r", encoding="utf-8")
 
 
 def iter_events(days: int = 30, root: Path | None = None) -> Iterator[dict]:
     """Yield events from the last N days. Newest file first, but events
-    within a file are chronological (write order)."""
+    within a file are chronological (write order).
+
+    Transparently reads both raw .jsonl and gzipped .jsonl.gz files.
+    """
     root = root or telemetry_root()
     if not root.exists():
         return
     for path in _day_files(root, days):
         try:
-            with path.open("r", encoding="utf-8") as f:
+            with _open_jsonl(path) as f:
                 for line in f:
                     line = line.strip()
                     if not line:

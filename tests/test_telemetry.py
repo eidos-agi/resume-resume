@@ -168,6 +168,92 @@ async def test_middleware_captures_error(tmp_path: Path, monkeypatch):
     assert "Traceback" in (event["error_tb"] or "")
 
 
+# ---------------------------------------------------------------------------
+# Gzip rotation (obs-002)
+# ---------------------------------------------------------------------------
+
+def test_gzip_rotation_compresses_old_files(tmp_path: Path, monkeypatch):
+    """obs-002: files older than 7 days get gzipped on next write."""
+    import gzip as _gzip
+
+    # Clear the rotation sentinel so _maybe_rotate runs
+    telemetry._ROTATE_SENTINEL.clear()
+    monkeypatch.setattr(telemetry, "_today_path", lambda: tmp_path / "today.jsonl")
+
+    # Create a "10 day old" file
+    old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+    old_file = tmp_path / f"{old_date}.jsonl"
+    old_file.write_text('{"tool": "old_one"}\n')
+
+    # Create a "3 day old" file (should NOT be gzipped)
+    recent_date = (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%d")
+    recent_file = tmp_path / f"{recent_date}.jsonl"
+    recent_file.write_text('{"tool": "recent_one"}\n')
+
+    # Write an event — triggers rotation
+    telemetry.write_event({"tool": "trigger"}, path=tmp_path / "today.jsonl")
+
+    # Old file should be gzipped
+    assert not old_file.exists(), "old .jsonl should have been removed"
+    gz_file = tmp_path / f"{old_date}.jsonl.gz"
+    assert gz_file.exists(), "old .jsonl.gz should have been created"
+
+    # Verify gzipped content is readable
+    with _gzip.open(gz_file, "rt") as f:
+        content = f.read()
+    assert '"old_one"' in content
+
+    # Recent file should be untouched
+    assert recent_file.exists()
+    assert not (tmp_path / f"{recent_date}.jsonl.gz").exists()
+
+
+def test_gzip_retention_deletes_beyond_limit(tmp_path: Path, monkeypatch):
+    """obs-002: RESUME_RESUME_TELEMETRY_RETENTION_DAYS deletes old gz files."""
+    import gzip as _gzip
+
+    telemetry._ROTATE_SENTINEL.clear()
+    monkeypatch.setattr(telemetry, "_today_path", lambda: tmp_path / "today.jsonl")
+    monkeypatch.setenv("RESUME_RESUME_TELEMETRY_RETENTION_DAYS", "30")
+
+    # Create a 60-day-old gz file (beyond 30-day retention)
+    old_date = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d")
+    gz_file = tmp_path / f"{old_date}.jsonl.gz"
+    with _gzip.open(gz_file, "wt") as f:
+        f.write('{"tool": "ancient"}\n')
+
+    # Create a 10-day-old gz file (within retention)
+    keep_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+    keep_gz = tmp_path / f"{keep_date}.jsonl.gz"
+    with _gzip.open(keep_gz, "wt") as f:
+        f.write('{"tool": "keep_me"}\n')
+
+    # Trigger rotation
+    telemetry.write_event({"tool": "trigger"}, path=tmp_path / "today.jsonl")
+
+    assert not gz_file.exists(), "60-day-old gz should be deleted"
+    assert keep_gz.exists(), "10-day-old gz should be kept"
+
+
+def test_gzip_rotation_runs_only_once_per_process(tmp_path: Path, monkeypatch):
+    """Sentinel prevents re-scanning on every write."""
+    telemetry._ROTATE_SENTINEL.clear()
+    monkeypatch.setattr(telemetry, "_today_path", lambda: tmp_path / "today.jsonl")
+
+    old_date = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+    old_file = tmp_path / f"{old_date}.jsonl"
+
+    # First write — rotation runs
+    old_file.write_text('{"tool": "x"}\n')
+    telemetry.write_event({"tool": "first"}, path=tmp_path / "today.jsonl")
+    assert not old_file.exists()  # gzipped
+
+    # Create another old file — second write should NOT rotate (sentinel set)
+    old_file.write_text('{"tool": "y"}\n')
+    telemetry.write_event({"tool": "second"}, path=tmp_path / "today.jsonl")
+    assert old_file.exists()  # sentinel blocked re-rotation
+
+
 @pytest.mark.asyncio
 async def test_middleware_respects_disable_env(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("RESUME_RESUME_TELEMETRY", "0")

@@ -64,3 +64,11 @@ Report to the user in 3–5 lines:
 - How many skipped / duplicates
 
 Then stop. The next run (manual or scheduled) picks up fresh telemetry.
+
+## Scheduling
+
+A1 is designed to run weekly. To automate:
+- `/schedule` in Claude Code to create a recurring trigger, or
+- `claude schedule create --name "a1-weekly" --cron "0 9 * * 1" --prompt "/a1"` from the terminal.
+
+Default cadence: Monday 9am. A2 may propose cadence changes via the inbox.

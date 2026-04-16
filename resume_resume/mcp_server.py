@@ -1853,6 +1853,19 @@ def self_proposal_history(limit: int = 100) -> dict:
     return _wrap(_meta.proposal_history(limit=limit))
 
 
+@mcp.tool()
+def self_a2_scorecard(days: int = 90) -> dict:
+    """Score A2's effectiveness: for each approved proposal, compare A1's
+    output before vs after the change. Shows whether A2's methodology
+    changes actually improved A1.
+
+    Each row: proposal title, expected_effect, A1 stats before/after
+    (count, auto_applied, queued, avg_confidence). The human judges
+    the trend.
+    """
+    return _meta.a2_scorecard(days=days)
+
+
 def main():
     if "--install" in sys.argv:
         snippet = {
