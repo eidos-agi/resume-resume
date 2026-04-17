@@ -42,35 +42,17 @@ truth instead of rediscovering the same problems every run.
 - **Test:** `tests/test_perf_regression.py::test_dirty_repos_cold_under_generous_ceiling`
   and `test_dirty_repos_cached_is_dramatically_faster_than_cold`
 
-### perf-002: `recent_sessions` is slow
+### perf-002: `recent_sessions` is slow (FIXED 7b2d2d4)
 
-- **Severity:** ★★
-- **Evidence:** 1132ms in A1's first telemetry observation; ~1200ms when
-  remeasured in the same session. Scans every session JSONL to find ones
-  within the time window.
-- **Why it sucks:** A common tool — users check "what was I doing" often.
-  Over 1 second of latency for a listing is sluggish.
-- **Root cause (unverified):** `find_recent_sessions` in
-  `resume_resume.sessions` likely walks every session file. No index.
-- **Workaround:** none shipped.
-- **Proposed fix:** similar shape to `dirty_repos` — cache recent listing
-  for N seconds and/or maintain a mtime-sorted index of session files.
-- **Test:** `tests/test_perf_regression.py::test_recent_sessions_under_generous_ceiling`
-  (ceiling is generous — 3000ms — because no fix has shipped yet. Tighten
-  when a fix lands.)
+- Fixed. 10-second TTL cache. Cold path still ~1200ms (upstream
+  `find_all_sessions`), cached path ~2ms.
+- **Test:** `tests/test_perf_regression.py::test_recent_sessions_cached_is_fast`
 
-### perf-003: `self_insights` has no cache
+### perf-003: `self_insights` has no cache (FIXED 7b2d2d4)
 
-- **Severity:** ★
-- **Evidence:** Currently ~5ms at low telemetry volume. No measured
-  regression yet, but the function re-reads all JSONL files on every call.
-- **Why it sucks:** As telemetry grows (weeks or months of data), every
-  call to `self_insights` scans N daily JSONL files. A1, A2, and the human
-  may each call it multiple times per run. Will degrade silently.
-- **Proposed fix:** in-memory cache keyed by `(days, mtime of latest jsonl)`,
-  invalidated when a new file appears. Or a daily index.
-- **Test:** `tests/test_perf_regression.py::test_self_insights_fast` (ceiling
-  500ms, currently passing with large margin.)
+- Fixed. 15-second TTL cache keyed by `days` parameter. Currently ~4ms
+  uncached, ~0ms cached.
+- **Test:** `tests/test_perf_regression.py::test_self_insights_cached_is_flagged`
 
 ---
 
@@ -101,21 +83,14 @@ truth instead of rediscovering the same problems every run.
 
 ## Observability
 
-### obs-001: Telemetry thresholds are miscalibrated below ~100 total calls
+### obs-001: Telemetry thresholds miscalibrated below ~100 calls (FIXED 7b2d2d4)
 
-- **Severity:** ★★
-- **Evidence:** `dead_tools = max(1, total_calls // 500)` → at any volume
-  below 500, the threshold is 1, so every tool with only 1 call gets
-  flagged as "dead." A1 observed this in its first run; A2 proposed a
-  prompt guardrail (pending inbox).
-- **Why it sucks:** `self_insights` produces noise that looks like signal
-  at low volume. A1 had to learn (and A2 had to codify) that the
-  `dead_tools` list is useless at this scale.
-- **Proposed fix:** either (a) raise the divisor so threshold floors at 0
-  until volume is meaningful, or (b) rewrite as a percentile-based metric.
-  Leaving to A2 for now; see pending proposal `f41baad32ae3`.
-- **Test:** none yet — behavior is threshold-driven and would need a
-  fixture with controlled telemetry to assert sensibly.
+- Fixed. Added `dead_tool_min_volume=100` to thresholds.json. Below that
+  volume, `insights_report` returns empty `dead_tools` list with
+  `dead_tools_suppressed_below_volume=true`. A2 proposal `f41baad32ae3`
+  (low-volume noise guardrail for A1's prompt) was approved and applied.
+- **Test:** `tests/test_perf_regression.py::test_obs001_*` (2 tests with
+  synthetic telemetry at 50 and 200 calls)
 
 ### obs-002: Telemetry JSONL files grow unbounded (FIXED 6c37624)
 
@@ -141,34 +116,18 @@ truth instead of rediscovering the same problems every run.
 
 ## Infrastructure / Dev ergonomics
 
-### obs-004: Test calls pollute production telemetry (FIXED this session)
+### obs-004: Test calls pollute production telemetry (FIXED 817d88a)
 
 - Fixed. `tests/conftest.py` sets `RESUME_RESUME_TELEMETRY=0` at import
-  time. Individual tests that need telemetry ON (middleware capture tests,
-  gzip rotation tests) re-enable via `monkeypatch.setenv`.
-- Bonus: test suite runtime dropped from ~120s to ~67s because MCP
-  integration tests no longer write bloated JSONL on every tool call.
-
----
-
-## Infrastructure / Dev ergonomics
+  time. Individual tests that need telemetry ON re-enable via monkeypatch.
+- Bonus: test suite runtime dropped from ~120s to ~32s.
 
 ### dx-001: No integration tests for most `self_*` MCP tools (FIXED 4d940c7)
 
-- **Severity:** ★
-- **Evidence:** Existing tests hit the underlying Python functions in
-  `meta_ai.py` and `telemetry_query.py` directly. `test_perf_regression.py`
-  adds some end-to-end coverage via `fastmcp.Client`, but most tools are
-  only tested at the unit layer.
-- **Why it sucks:** Tool schema regressions, parameter-type changes, and
-  MCP serialization bugs can slip through unit tests. The
-  `correctness-001` and `correctness-002` bugs both landed because of
-  MCP-layer behavior (transport serialization, response wrapping) that
-  unit tests couldn't see.
-- **Proposed fix:** a small `tests/test_mcp_surface.py` that round-trips
-  every MCP tool through `fastmcp.Client` with canonical args, asserting
-  the response shape matches the tool's type annotation.
-- **Test:** none yet.
+- Fixed. `tests/test_mcp_surface.py` — 17 integration tests via
+  `fastmcp.Client`. Covers dict-returning tools (key presence),
+  list-returning tools ({items, count} shape), validation rejections,
+  core tool smoke, and A2 scorecard.
 
 ### dx-002: `pyright` can't resolve some internal imports
 
