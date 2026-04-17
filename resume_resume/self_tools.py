@@ -290,7 +290,33 @@ def register_self_tools(mcp_instance):
             except (subprocess.TimeoutExpired, OSError):
                 pass
 
-        return {
+        # L2 topic summaries if available — project narrative context
+        topics = None
+        try:
+            from claude_session_commons.insights import get_db
+            conn = get_db()
+            rows = conn.execute(
+                """SELECT title, summary_text FROM summary_levels
+                   WHERE level = 2 AND entity_id LIKE ? || '::%'
+                   ORDER BY updated_at DESC""",
+                (project_path,),
+            ).fetchall()
+            if rows:
+                import json as _json
+                topics = []
+                for r in rows:
+                    try:
+                        s = _json.loads(r[1]) if isinstance(r[1], str) else (r[1] or {})
+                    except Exception:
+                        s = {}
+                    topics.append({
+                        "topic": s.get("topic_name", r[0]),
+                        "status": s.get("status", ""),
+                    })
+        except Exception:
+            pass
+
+        result = {
             "project": project,
             "project_path": project_path,
             "hours": hours,
@@ -300,3 +326,6 @@ def register_self_tools(mcp_instance):
             "git_dirty_files": dirty_files,
             "git_dirty_count": len(dirty_files),
         }
+        if topics:
+            result["l2_topics"] = topics
+        return result
