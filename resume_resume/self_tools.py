@@ -484,12 +484,18 @@ def register_self_tools(mcp_instance):
                 except (OSError, AttributeError):
                     pass
 
+            # Average health score across sessions
+            from .mcp_server import _session_health
+            health_scores = [_session_health(s, cache_index=cache_index).get("health", 0) for s in sessions]
+            avg_health = round(sum(health_scores) / len(health_scores), 0) if health_scores else 0
+
             latest = max(s["mtime"] for s in sessions)
             projects.append({
                 "project": shorten_path(pd),
                 "sessions": len(sessions),
                 "commits": commit_count,
                 "est_hours": round(est_hours, 1),
+                "avg_health": avg_health,
                 "last_active": datetime.fromtimestamp(latest).strftime("%Y-%m-%d %H:%M"),
             })
             total_sessions += len(sessions)
