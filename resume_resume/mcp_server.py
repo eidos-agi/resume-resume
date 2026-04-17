@@ -257,7 +257,7 @@ def _search_l2_topics(query_tokens: list[str], limit: int = 5) -> list[dict]:
 
 @mcp.tool()
 def search_sessions(query: str, limit: int = 10, include_automated: bool = False,
-                    hours: int = 0) -> dict:
+                    hours: int = 0, project: str = "") -> dict:
     """Search all Claude Code sessions by keywords (~3s for 5000+ sessions).
 
     Query syntax:
@@ -286,6 +286,9 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
       hours: If > 0, only search sessions modified within the last N hours.
         Useful for temporal queries ("what was I doing yesterday" → hours=48).
         Default 0 = search all sessions.
+      project: If non-empty, filter to sessions in projects whose path
+        contains this substring. Case-insensitive. "ciso" matches
+        /Users/.../repos-aic/ciso. Default "" = search all projects.
     """
     from .bm25 import tokenize, build_corpus_stats, score_session
 
@@ -319,6 +322,11 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
     if hours > 0:
         cutoff = time.time() - hours * 3600
         all_sessions = [s for s in all_sessions if s["mtime"] >= cutoff]
+
+    # Project filter: restrict to sessions in matching projects
+    if project:
+        project_lower = project.lower()
+        all_sessions = [s for s in all_sessions if project_lower in s.get("project_dir", "").lower()]
 
     # Progress HUD — channel per search query
     p_ctx = progress(f"search: {query}")
