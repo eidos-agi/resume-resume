@@ -329,3 +329,75 @@ def register_self_tools(mcp_instance):
         if topics:
             result["l2_topics"] = topics
         return result
+
+    # --- Cross-project activity summary ---
+
+    @mcp_instance.tool()
+    def my_week(hours: int = 168, min_sessions: int = 1) -> dict:
+        """What you shipped across ALL projects in a time window.
+
+        Cross-project activity summary — not one project but all of them.
+        Returns per-project session counts, git commit counts, and dirty
+        state. Use for weekly standups, time tracking, or "what did I do?"
+
+        Parameters:
+          hours: Lookback window (default 168 = 1 week).
+          min_sessions: Only include projects with at least this many
+            sessions in the window (default 1). Set to 2+ to filter noise.
+        """
+        from .mcp_server import _find_all_sessions_cached, shorten_path
+
+        all_sessions = _find_all_sessions_cached()
+        cutoff = time.time() - hours * 3600
+
+        # Group recent sessions by project
+        by_project: dict[str, list] = {}
+        for s in all_sessions:
+            if s["mtime"] < cutoff:
+                continue
+            pd = s.get("project_dir", "")
+            if not pd or pd == str(Path.home()):
+                continue
+            by_project.setdefault(pd, []).append(s)
+
+        # Build per-project summary
+        projects = []
+        total_sessions = 0
+        total_commits = 0
+
+        for pd, sessions in sorted(by_project.items(),
+                                     key=lambda x: max(s["mtime"] for s in x[1]),
+                                     reverse=True):
+            if len(sessions) < min_sessions:
+                continue
+
+            # Git commit count in the window
+            commit_count = 0
+            if Path(pd).is_dir():
+                try:
+                    since = datetime.fromtimestamp(cutoff).strftime("%Y-%m-%d")
+                    log = subprocess.run(
+                        ["git", "log", f"--since={since}", "--oneline", "-100"],
+                        cwd=pd, capture_output=True, text=True, timeout=5,
+                    )
+                    commit_count = len([l for l in log.stdout.splitlines() if l.strip()])
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
+
+            latest = max(s["mtime"] for s in sessions)
+            projects.append({
+                "project": shorten_path(pd),
+                "sessions": len(sessions),
+                "commits": commit_count,
+                "last_active": datetime.fromtimestamp(latest).strftime("%Y-%m-%d %H:%M"),
+            })
+            total_sessions += len(sessions)
+            total_commits += commit_count
+
+        return {
+            "hours": hours,
+            "active_projects": len(projects),
+            "total_sessions": total_sessions,
+            "total_commits": total_commits,
+            "projects": projects,
+        }
