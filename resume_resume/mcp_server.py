@@ -412,18 +412,18 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         sid = s["session_id"]
         cached = cache_index.get(sid)
 
-        final, summary_bm25, raw_bm25, recency = score_session(
+        final, _, _, _ = score_session(
             query_tokens, cached, total_count, raw_len,
             s["mtime"], corpus,
         )
 
-        scored.append((s, total_count, snippet, final, summary_bm25, raw_bm25, recency))
+        scored.append((s, total_count, snippet, final))
 
     scored.sort(key=lambda x: x[3], reverse=True)
     scored = scored[:limit]
 
     p.update(f"Top {len(scored)} results scored", icon="done", highlight=True)
-    for s, total_count, snippet, final, *_ in scored[:5]:
+    for s, total_count, snippet, final in scored[:5]:
         title = s.get("title", s.get("session_id", "")[:30])
         proj = shorten_path(s.get("project", ""))
         p.result(title, f"{proj} | score {final:.0f} | {total_count} hits",
@@ -435,7 +435,7 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
             "hits": total_count,
             "snippet": snippet,
         })
-        for s, total_count, snippet, final, summary_bm25, raw_bm25, recency in scored
+        for s, total_count, snippet, final in scored
     ]
 
     # L2 fallback: if BM25 found nothing, search project topic summaries.
@@ -745,12 +745,6 @@ def _scan_repo_git(repo_path: str) -> dict | None:
         }
     except (subprocess.TimeoutExpired, OSError):
         return None
-
-
-def _extract_last_user_message(session_file: Path) -> str:
-    """Read last user message from a JSONL session file for context when no summary exists."""
-    ctx = _extract_crash_context(session_file)
-    return ctx.get("last_user_msg") or ""
 
 
 def _extract_crash_context(session_file: Path) -> dict:
