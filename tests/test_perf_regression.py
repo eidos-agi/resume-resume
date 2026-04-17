@@ -20,6 +20,7 @@ import pytest_asyncio
 from fastmcp import Client
 
 from resume_resume import mcp_server as ms
+from resume_resume import self_tools as _st
 
 
 def _bust_dirty_repos_cache() -> None:
@@ -28,7 +29,7 @@ def _bust_dirty_repos_cache() -> None:
 
 
 def _bust_self_insights_cache() -> None:
-    ms._SELF_INSIGHTS_CACHE.clear()
+    _st._SELF_INSIGHTS_CACHE.clear()
 
 
 def _bust_recent_sessions_cache() -> None:
