@@ -571,8 +571,8 @@ def register_self_tools(mcp_instance):
                     pass
 
             # Estimate hours from JSONL timestamps (O(1) per session)
-            from .mcp_server import _session_duration_hours
-            est_hours = sum(_session_duration_hours(s["file"]) for s in sessions)
+            from .session_utils import session_duration_hours
+            est_hours = sum(session_duration_hours(s["file"]) for s in sessions)
 
             # Average health score across sessions
             from .mcp_server import _session_health
