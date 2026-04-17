@@ -575,22 +575,33 @@ _RECENT_SESSIONS_CACHE_TTL = 10.0  # seconds — short because sessions change f
 
 
 @mcp.tool()
-def recent_sessions(hours: int = 24, limit: int = 10) -> dict:
+def recent_sessions(hours: int = 24, limit: int = 10, project: str = "") -> dict:
     """List recently active Claude Code sessions.
 
     Resume any session with: claude --resume <id>
 
-    Result is cached for 10 seconds per (hours, limit) key so rapid
-    back-to-back calls are free. Short TTL because sessions churn.
+    Parameters:
+      hours: Lookback window (default 24).
+      limit: Max results (default 10, max 25).
+      project: If non-empty, filter to sessions in projects whose path
+        contains this substring. Case-insensitive. "ciso" matches
+        /Users/.../repos-aic/ciso. Default "" = all projects.
+
+    Result is cached for 10 seconds per (hours, limit, project) key so
+    rapid back-to-back calls are free. Short TTL because sessions churn.
     """
     limit = max(1, min(limit, 25))
-    cache_key = (hours, limit)
+    cache_key = (hours, limit, project.lower())
     now = time.time()
     cached = _RECENT_SESSIONS_CACHE.get(cache_key)
     if cached and (now - cached["ts"]) < _RECENT_SESSIONS_CACHE_TTL:
         return {**cached["data"], "cached": True, "cache_age_s": round(now - cached["ts"], 1)}
 
-    sessions = find_recent_sessions(hours, max_sessions=limit)
+    sessions = find_recent_sessions(hours, max_sessions=0 if project else limit)
+    if project:
+        project_lower = project.lower()
+        sessions = [s for s in sessions if project_lower in s.get("project_dir", "").lower()]
+        sessions = sessions[:limit]
     items = [_session_row(s) for s in sessions]
     data = {"items": items, "count": len(items), "cached": False}
     _RECENT_SESSIONS_CACHE[cache_key] = {"data": data, "ts": now}
