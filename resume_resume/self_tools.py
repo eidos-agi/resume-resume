@@ -272,7 +272,7 @@ def register_self_tools(mcp_instance):
         """
         from .mcp_server import (
             _find_all_sessions_cached, _get_cache_index, _session_health,
-            _scan_repo_git, shorten_path,
+            shorten_path, _DIRTY_REPOS_CACHE, _DIRTY_REPOS_CACHE_TTL,
         )
         import json as _json
 
@@ -281,22 +281,24 @@ def register_self_tools(mcp_instance):
         cutoff = time.time() - hours * 3600
         suggestions = []
 
-        # 1. Dirty repos — uncommitted work needs attention
-        seen_projects: set[str] = set()
-        for s in all_sessions:
-            pd = s.get("project_dir", "")
-            if not pd or pd == str(Path.home()) or pd in seen_projects:
-                continue
-            if (time.time() - s.get("mtime", 0)) > 30 * 86400:
-                continue
-            seen_projects.add(pd)
+        # 1. Dirty repos — use the cached dirty_repos result if available,
+        #    otherwise call dirty_repos tool (which caches for 30s).
+        #    Avoids 20 × _scan_repo_git subprocess calls per suggest_next.
+        now = time.time()
+        cached_dirty = _DIRTY_REPOS_CACHE.get("data")
+        if cached_dirty and (now - _DIRTY_REPOS_CACHE.get("ts", 0)) < _DIRTY_REPOS_CACHE_TTL:
+            dirty_list = cached_dirty.get("dirty", [])
+        else:
+            # No cached data — skip dirty repo suggestions this call.
+            # dirty_repos will be cached after boot_up or dirty_repos runs.
+            dirty_list = []
 
-        for pd in list(seen_projects)[:20]:  # cap to avoid long scans
-            result = _scan_repo_git(pd)
-            if result and result.get("dirty"):
-                count = result.get("dirty_file_count", len(result.get("dirty_files", [])))
+        for d in dirty_list:
+            count = d.get("dirty_file_count", len(d.get("dirty_files", [])))
+            proj = d.get("path", "")
+            if proj:
                 suggestions.append({
-                    "project": shorten_path(pd),
+                    "project": proj,
                     "action": "commit",
                     "reason": f"{count} uncommitted files",
                     "priority": min(100, 40 + count * 5),
