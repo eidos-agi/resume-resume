@@ -570,16 +570,9 @@ def register_self_tools(mcp_instance):
                 except (subprocess.TimeoutExpired, OSError):
                     pass
 
-            # Estimate hours from session file timestamps
-            est_hours = 0.0
-            for s in sessions:
-                try:
-                    birth = s["file"].stat().st_birthtime
-                    dur = s["mtime"] - birth
-                    if 60 < dur < 86400:  # between 1 min and 24 hours
-                        est_hours += dur / 3600
-                except (OSError, AttributeError):
-                    pass
+            # Estimate hours from JSONL timestamps (O(1) per session)
+            from .mcp_server import _session_duration_hours
+            est_hours = sum(_session_duration_hours(s["file"]) for s in sessions)
 
             # Average health score across sessions
             from .mcp_server import _session_health

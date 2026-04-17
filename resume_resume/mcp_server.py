@@ -163,26 +163,81 @@ def _get_title(session_id: str, session_file: Path) -> str:
     return summary.get("title", "") if isinstance(summary, dict) else ""
 
 
+def _session_duration_hours(f) -> float:
+    """Estimate session duration. Prefers file birthtime (measures current
+    file lifespan, conservative). Falls back to JSONL first→last timestamps
+    when birthtime is unavailable. Capped at 24h — sessions left open for
+    days shouldn't count full idle time as work.
+    """
+    try:
+        stat = f.stat()
+        # Primary: file birthtime → mtime (measures the current file's lifespan)
+        try:
+            birth = stat.st_birthtime
+            delta = stat.st_mtime - birth
+            if delta > 60:
+                return min(delta / 3600, 24.0)
+        except AttributeError:
+            pass  # non-macOS, fall through to JSONL
+
+        # Fallback: JSONL first→last entry timestamps
+        size = stat.st_size
+        if size < 100:
+            return 0.0
+        first_ts = None
+        with open(f, "rb") as fh:
+            for _ in range(20):
+                line = fh.readline()
+                if not line:
+                    break
+                try:
+                    entry = json.loads(line.decode("utf-8", errors="replace"))
+                    ts = entry.get("timestamp")
+                    if ts:
+                        first_ts = ts
+                        break
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        last_ts = None
+        if first_ts:
+            with open(f, "rb") as fh:
+                fh.seek(max(0, size - 2048))
+                tail = fh.read().decode("utf-8", errors="replace")
+                for line in reversed(tail.splitlines()):
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line.strip())
+                        ts = entry.get("timestamp")
+                        if ts:
+                            last_ts = ts
+                            break
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+        if first_ts and last_ts:
+            t0 = datetime.fromisoformat(str(first_ts).replace("Z", "+00:00"))
+            t1 = datetime.fromisoformat(str(last_ts).replace("Z", "+00:00"))
+            delta = (t1 - t0).total_seconds()
+            if delta > 60:
+                return min(delta / 3600, 24.0)
+    except (OSError, ValueError, TypeError):
+        pass
+    return 0.0
+
+
 def _session_health(s: dict, cache_index: dict | None = None) -> dict:
     """Score a session's value density from metadata + cache.
 
-    Uses stat() for timestamps + the bulk-loaded cache_index for summary
-    presence — no per-session file reads. Pass cache_index from
-    _get_cache_index() for batch scoring; if None, falls back to
-    per-session cache read.
+    Uses JSONL head+tail timestamps for duration (O(1) I/O) + the
+    bulk-loaded cache_index for summary presence. Pass cache_index
+    from _get_cache_index() for batch scoring.
 
     Score 0-100. >60 = healthy. <20 = noise.
     """
     sid = s["session_id"]
     size_bytes = s.get("size", 0)
 
-    # Duration from file timestamps
-    dur_hours = 0.0
-    try:
-        birth = s["file"].stat().st_birthtime
-        dur_hours = max(0, (s["mtime"] - birth)) / 3600
-    except (OSError, AttributeError):
-        pass
+    dur_hours = _session_duration_hours(s["file"])
 
     size_score = min(1.0, max(0, math.log10(max(size_bytes, 1)) - 4) / 3)
     dur_score = min(1.0, dur_hours / 2.0) if dur_hours > 0.01 else 0.0
