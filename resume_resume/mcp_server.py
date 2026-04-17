@@ -1904,8 +1904,20 @@ def _trace_merges(session_file: Path, chain: list, visited: set) -> None:
 try:
     from .data_science.mcp_tools import register_tools as _register_ds_tools
     _register_ds_tools(mcp)
-except ImportError:
-    pass
+except Exception:
+    # Fallback: register stub tools that explain missing deps
+    _DS_TOOLS = ["session_insights", "session_xray", "session_report", "session_data_science"]
+    for _tool_name in _DS_TOOLS:
+        def _make_stub(name):
+            @mcp.tool(name=name)
+            def _stub(**kwargs) -> dict:
+                return {
+                    "error": f"'{name}' requires optional dependencies. Install with: pip install resume-resume[train]",
+                    "install_cmd": "pip install resume-resume[train]",
+                    "missing": "scipy, scikit-learn, pandas",
+                }
+            return _stub
+        _make_stub(_tool_name)
 
 # Register L2/L3 project summary tools (requires insights.db from commons daemon)
 try:
