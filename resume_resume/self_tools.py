@@ -256,6 +256,102 @@ def register_self_tools(mcp_instance):
 
         return {"items": rows[:limit], "count": min(len(rows), limit)}
 
+    # --- What should I work on next? ---
+
+    @mcp_instance.tool()
+    def suggest_next(hours: int = 168) -> dict:
+        """Suggest what to work on next based on signals across all projects.
+
+        Combines: dirty repos (uncommitted work), recent session health
+        (which projects had productive sessions), bookmarked blockers
+        (what's stuck), and staleness (what hasn't been touched).
+
+        Returns a prioritized list of suggestions with reasons.
+        NOT an AI recommendation — just signal aggregation that helps
+        the human decide.
+        """
+        from .mcp_server import (
+            _find_all_sessions_cached, _get_cache_index, _session_health,
+            _scan_repo_git, shorten_path,
+        )
+        import json as _json
+
+        all_sessions = _find_all_sessions_cached()
+        cache_index = _get_cache_index()
+        cutoff = time.time() - hours * 3600
+        suggestions = []
+
+        # 1. Dirty repos — uncommitted work needs attention
+        seen_projects: set[str] = set()
+        for s in all_sessions:
+            pd = s.get("project_dir", "")
+            if not pd or pd == str(Path.home()) or pd in seen_projects:
+                continue
+            if (time.time() - s.get("mtime", 0)) > 30 * 86400:
+                continue
+            seen_projects.add(pd)
+
+        for pd in list(seen_projects)[:20]:  # cap to avoid long scans
+            result = _scan_repo_git(pd)
+            if result and result.get("dirty"):
+                count = result.get("dirty_file_count", len(result.get("dirty_files", [])))
+                suggestions.append({
+                    "project": shorten_path(pd),
+                    "action": "commit",
+                    "reason": f"{count} uncommitted files",
+                    "priority": min(100, 40 + count * 5),
+                })
+
+        # 2. Bookmarked blockers — stuck projects need unblocking
+        bookmarks_dir = Path.home() / ".claude" / "bookmarks"
+        if bookmarks_dir.is_dir():
+            for bf in bookmarks_dir.glob("*-bookmark.json"):
+                try:
+                    data = _json.loads(bf.read_text())
+                    state = data.get("lifecycle_state", "")
+                    if state == "blocked":
+                        proj = data.get("project", {}).get("path", "")
+                        blockers = data.get("context", {}).get("blockers", [])
+                        if proj:
+                            suggestions.append({
+                                "project": shorten_path(proj),
+                                "action": "unblock",
+                                "reason": blockers[0] if blockers else "blocked (no reason given)",
+                                "priority": 90,
+                            })
+                except (ValueError, OSError):
+                    continue
+
+        # 3. High-health recent sessions — momentum to continue
+        recent = [
+            s for s in all_sessions
+            if s["mtime"] >= cutoff
+            and cache_index.get(s["session_id"], {}).get("classification") != "automated"
+            and s.get("project_dir", "") != str(Path.home())
+        ]
+        # Find the highest-health recent session per project
+        best_by_project: dict[str, tuple] = {}
+        for s in recent:
+            pd = s.get("project_dir", "")
+            h = _session_health(s, cache_index=cache_index).get("health", 0)
+            if pd not in best_by_project or h > best_by_project[pd][1]:
+                best_by_project[pd] = (s, h)
+
+        for pd, (s, health) in best_by_project.items():
+            if health >= 70:
+                # Check if already suggested (dirty/blocked)
+                already = any(sg["project"] == shorten_path(pd) for sg in suggestions)
+                if not already:
+                    suggestions.append({
+                        "project": shorten_path(pd),
+                        "action": "continue",
+                        "reason": f"recent productive session (health {health:.0f})",
+                        "priority": int(health * 0.6),
+                    })
+
+        suggestions.sort(key=lambda x: x["priority"], reverse=True)
+        return {"suggestions": suggestions[:10], "count": len(suggestions)}
+
     # --- Cross-session project changelog ---
 
     @mcp_instance.tool()
