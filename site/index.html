@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>resume-resume</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <div class="brand">
+          <img src="../assets/logo.png" alt="" class="brand-mark">
+          <div>
+            <div class="brand-name">resume-resume</div>
+            <div class="brand-sub">Claude Code memory</div>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-mode="all"><span>⌘</span> Search</button>
+          <button class="nav-item" type="button" data-panel="card"><span>↩</span> Resume Card</button>
+          <button class="nav-item" type="button" data-mode="hot"><span>◷</span> Hot Sessions</button>
+          <button class="nav-item" type="button" data-mode="cold"><span>▦</span> Cold Index</button>
+        </nav>
+
+        <div class="index-panel">
+          <div class="panel-label">Index</div>
+          <div class="metric-row"><span>Cold sessions</span><strong id="coldSessions">...</strong></div>
+          <div class="metric-row"><span>Hot sessions</span><strong id="hotSessions">0</strong></div>
+          <div class="meter"><span id="indexMeter" style="width:38%"></span></div>
+          <div class="panel-note" id="indexNote">Budgeted refresh is walking the backlog without blocking search.</div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <label class="searchbox">
+            <span class="search-icon">⌕</span>
+              <input id="sessionSearch" type="search" autocomplete="off" placeholder="Search real sessions, files, repos, decisions...">
+            <kbd>/</kbd>
+          </label>
+          <div class="top-actions">
+            <button type="button" class="icon-button" id="refreshIndex" title="Refresh cold index">↻</button>
+            <button type="button" class="command-button" id="latestCard">resume-card</button>
+          </div>
+        </header>
+
+        <section class="summary-strip" aria-label="System status">
+          <div class="stat">
+            <span>Hot window</span>
+            <strong id="hotWindow">30m</strong>
+          </div>
+          <div class="stat">
+            <span>CLI card</span>
+            <strong>255ms</strong>
+          </div>
+          <div class="stat">
+            <span>FTS query</span>
+            <strong id="queryMs">1-5ms</strong>
+          </div>
+          <div class="stat">
+            <span>Mode</span>
+            <strong>Live + indexed</strong>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="results-pane">
+            <div class="section-head">
+              <div>
+                <h1>Session Search</h1>
+                <p id="resultSummary">Recent work stays live. Older work comes from the cold index.</p>
+              </div>
+              <div class="segmented" role="group" aria-label="Search mode">
+                <button class="selected" type="button" data-mode="all">All</button>
+                <button type="button" data-mode="hot">Hot</button>
+                <button type="button" data-mode="cold">Cold</button>
+              </div>
+            </div>
+
+            <div class="filters" aria-label="Search filters">
+              <label>
+                <span>Window</span>
+                <select id="hoursFilter">
+                  <option value="0">All time</option>
+                  <option value="1">Last hour</option>
+                  <option value="24">24 hours</option>
+                  <option value="168">7 days</option>
+                </select>
+              </label>
+              <label>
+                <span>Project</span>
+                <input id="projectFilter" type="search" autocomplete="off" placeholder="repo or path">
+              </label>
+              <button type="button" id="clearFilters">Clear</button>
+            </div>
+
+            <div class="table" id="sessionTable" aria-live="polite">
+              <button class="session-row selected" type="button" data-session="519da2f0-d076-4568-b6e4-93d81bddd4ae" data-query="resume-resume slow mcp search cockpit eidos claude code">
+                <span class="status-dot hot"></span>
+                <span class="session-main">
+                  <strong>resume-resume is insanely slow... can you see this from the MCP?</strong>
+                  <small>~/repos-eidos-agi/cockpit-eidos · mcp__resume-resume__session_summary</small>
+                </span>
+                <span class="session-meta">20d ago</span>
+              </button>
+              <button class="session-row" type="button" data-query="indexed search sqlite fts cold index benchmark resume">
+                <span class="status-dot cold"></span>
+                <span class="session-main">
+                  <strong>SQLite cold index for search_sessions</strong>
+                  <small>~/repos-eidos-agi/resume-resume · 2,560 indexed sessions</small>
+                </span>
+                <span class="session-meta">110ms</span>
+              </button>
+              <button class="session-row" type="button" data-query="resume card cli popup hud local t5 onnx summary">
+                <span class="status-dot ready"></span>
+                <span class="session-main">
+                  <strong>Fast resume card CLI and HUD event stream</strong>
+                  <small>cr card --json · cr card --events · resume-card</small>
+                </span>
+                <span class="session-meta">255ms</span>
+              </button>
+              <button class="session-row" type="button" data-query="dirty repos git status cockpit eidos files state research">
+                <span class="status-dot dirty"></span>
+                <span class="session-main">
+                  <strong>Dirty repo context attached to resume cards</strong>
+                  <small>7 files · .research/research.json · state.json</small>
+                </span>
+                <span class="session-meta">active</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="detail-pane" aria-label="Selected session detail">
+            <div class="card-header">
+              <span class="pill" id="detailSource">resume card</span>
+              <span class="card-age" id="detailAge">cached-summary</span>
+            </div>
+            <h2 id="detailTitle">resume-resume is insanely slow... can you see this from the MCP?</h2>
+            <p id="detailBody">Everything works. Discovery is fixed, search is now indexed, and the card can open without waiting on Claude Code.</p>
+
+            <div class="command-line">
+              <code id="detailCommand">claude --resume 519da2f0-d076-4568-b6e4-93d81bddd4ae</code>
+              <button type="button" id="copyCommand" title="Copy command">⧉</button>
+            </div>
+
+            <div class="detail-list">
+              <div><span>Project</span><strong id="detailProject">~/repos-eidos-agi/cockpit-eidos</strong></div>
+              <div><span>Last tool</span><strong id="detailTool">mcp__resume-resume__session_summary</strong></div>
+              <div><span>Git</span><strong id="detailGit">Dirty, 7 files</strong></div>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section-title">Last user</div>
+              <p id="detailUser">Select a live result to read the handoff.</p>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section-title">Files</div>
+              <ul id="detailFiles" class="file-list"></ul>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

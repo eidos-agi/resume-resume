@@ -597,6 +597,18 @@ def main():
         run_v2(hours=hours, search_term=search_term)
         sys.exit(0)
 
+    if len(sys.argv) > 1 and sys.argv[1] == "card":
+        from .resume_card import main as card_main
+
+        card_main(sys.argv[2:])
+        sys.exit(0)
+
+    if len(sys.argv) > 1 and sys.argv[1] == "site":
+        from .site_server import main as site_main
+
+        site_main(sys.argv[2:])
+        sys.exit(0)
+
     if len(sys.argv) > 1 and sys.argv[1] in ("k", "--cluster"):
         hours = 48
         if len(sys.argv) > 2:

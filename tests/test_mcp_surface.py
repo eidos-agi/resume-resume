@@ -14,6 +14,8 @@ See docs/known-issues.md dx-001.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
 from fastmcp import Client
@@ -238,6 +240,32 @@ async def test_search_sessions_hours_filter(client):
     assert "items" in d
     # Can't assert exact count but shape must be correct
     assert d["count"] == len(d["items"])
+
+
+@pytest.mark.asyncio
+async def test_data_science_stubs_register_without_kwargs():
+    """Optional data-science fallback tools must stay FastMCP-compatible."""
+    from fastmcp import FastMCP
+    from resume_resume.mcp_server import _register_data_science_stubs
+
+    fallback_mcp = FastMCP("resume-resume-test")
+    _register_data_science_stubs(fallback_mcp)
+
+    async with Client(fallback_mcp) as c:
+        r = await c.call_tool("session_data_science", {})
+
+    assert r.data["install_cmd"] == "pip install resume-resume[train]"
+    assert "scipy" in r.data["missing"]
+
+
+def test_train_extra_includes_data_science_import_deps():
+    """The advertised train extra must include imports used by data-science tools."""
+    import tomllib
+
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text())
+    train_deps = set(pyproject["project"]["optional-dependencies"]["train"])
+
+    assert {"pandas", "scipy", "scikit-learn"}.issubset(train_deps)
 
 
 @pytest.mark.asyncio

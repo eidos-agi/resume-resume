@@ -30,6 +30,10 @@ from .sessions import (
 from claude_session_commons import decode_project_path
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
 from .progress import progress
+from .search_index import HOT_WINDOW_SECONDS
+from .search_index import refresh_budget as refresh_search_index_budget
+from .search_index import search as search_cold_index
+from .search_index import status as search_index_status
 
 mcp = FastMCP("resume-resume")
 mcp.add_middleware(TelemetryMiddleware())
@@ -63,6 +67,9 @@ def _find_all_sessions_cached() -> list[dict]:
 _CACHE_INDEX: dict = {"data": None, "ts": 0.0}
 _CACHE_INDEX_TTL = 30.0
 
+_HOT_SESSIONS_CACHE: dict = {"data": None, "ts": 0.0}
+_HOT_SESSIONS_CACHE_TTL = 5.0
+
 
 def _get_cache_index() -> dict[str, dict]:
     now = time.time()
@@ -80,6 +87,52 @@ def _get_cache_index() -> dict[str, dict]:
     _CACHE_INDEX["data"] = cache_index
     _CACHE_INDEX["ts"] = time.time()
     return cache_index
+
+
+def _indexed_sessions_only() -> list[dict]:
+    """Return sessions from the daemon index without filesystem discovery.
+
+    claude-session-commons.find_all_sessions() also scans ~/.claude/projects for
+    sessions missing from the index. That is useful for maintenance, but too
+    expensive for request-time search on a machine with tens of thousands of
+    session files.
+    """
+    try:
+        from claude_session_commons.session_index import SessionIndex
+        known = SessionIndex.get_default().get_all()
+    except Exception:
+        return []
+
+    sessions = []
+    for sid, meta in known.items():
+        try:
+            size = meta.get("size", 0)
+            if size < 100:
+                continue
+            sessions.append({
+                "file": Path(meta["file_path"]),
+                "session_id": sid,
+                "project_dir": meta.get("project_dir", ""),
+                "mtime": float(meta.get("mtime") or 0.0),
+                "size": size,
+                "last_entry_type": meta.get("last_entry_type"),
+            })
+        except Exception:
+            continue
+    sessions.sort(key=lambda s: s["mtime"], reverse=True)
+    return sessions
+
+
+def _hot_sessions(window_seconds: int = HOT_WINDOW_SECONDS) -> list[dict]:
+    now = time.time()
+    cached = _HOT_SESSIONS_CACHE["data"]
+    if cached is not None and now - _HOT_SESSIONS_CACHE["ts"] < _HOT_SESSIONS_CACHE_TTL:
+        return cached
+    cutoff = now - window_seconds
+    sessions = [s for s in _indexed_sessions_only() if s["mtime"] >= cutoff]
+    _HOT_SESSIONS_CACHE["data"] = sessions
+    _HOT_SESSIONS_CACHE["ts"] = now
+    return sessions
 
 
 def _summary_valid(summary: dict) -> bool:
@@ -328,7 +381,14 @@ def _search_l2_topics(query_tokens: list[str], limit: int = 5) -> list[dict]:
 @mcp.tool()
 def search_sessions(query: str, limit: int = 10, include_automated: bool = False,
                     hours: int = 0, project: str = "") -> dict:
-    """Search all Claude Code sessions by keywords (~3s for 5000+ sessions).
+    """Search Claude Code sessions by keywords.
+
+    Uses a two-tier search path:
+      - live scan for sessions touched in the last 30 minutes
+      - SQLite/FTS cold index for older sessions
+
+    This keeps fresh crash-resume context visible without request-time scans of
+    the full session/summaries directory.
 
     Query syntax:
       - Multiple words: AND logic (all must appear). "visa mastercard" finds
@@ -336,18 +396,8 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
       - Quoted phrases: exact match. '"mountain creek"' finds that exact phrase.
       - Single word: standard search.
 
-    Returns matches ranked by BM25 relevance with summary-first scoring:
-      - Summary BM25 (60%): matches in AI-generated session summaries
-        (title + goal + what_was_done) — measures what the session IS ABOUT
-      - Raw text BM25 (25%): matches in full conversation text with term
-        saturation and length normalization
-      - Recency (15%): exponential decay with 30-day half-life as tiebreaker
-
-    Score is 0-100. Higher = more relevant. The score reflects real
-    magnitude differences — a session scoring 75 is meaningfully more
-    relevant than one scoring 30.
-
-    Each result includes hits (raw term count) and a contextual snippet.
+    Hot results include raw hit counts and snippets. Cold results come from the
+    summary/search-text FTS index and include source="cold-index".
     Use read_session() to drill into a result. Resume with: claude --resume <id>
 
     Parameters:
@@ -360,8 +410,6 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         contains this substring. Case-insensitive. "ciso" matches
         /Users/.../repos-aic/ciso. Default "" = search all projects.
     """
-    from .bm25 import tokenize, build_corpus_stats, score_session
-
     _empty = {"items": [], "count": 0}
     query = query.strip()
     if not query:
@@ -383,60 +431,27 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
     if not terms_bytes:
         return _empty
 
-    # Tokenize query for BM25 (separate from byte terms used for matching)
-    query_tokens = tokenize(query)
-
-    all_sessions = _find_all_sessions_cached()
-
-    # Temporal filter: restrict to sessions within the time window
+    now = time.time()
+    hot_cutoff = now - HOT_WINDOW_SECONDS
+    cutoff = 0.0
     if hours > 0:
-        cutoff = time.time() - hours * 3600
-        all_sessions = [s for s in all_sessions if s["mtime"] >= cutoff]
+        cutoff = now - hours * 3600
 
-    # Project filter: restrict to sessions in matching projects
+    # Hot path: only sessions touched in the last 30 minutes are scanned live.
+    hot_sessions = _hot_sessions()
+    if cutoff:
+        hot_sessions = [s for s in hot_sessions if s["mtime"] >= cutoff]
+
     if project:
         project_lower = project.lower()
-        all_sessions = [s for s in all_sessions if project_lower in s.get("project_dir", "").lower()]
+        hot_sessions = [s for s in hot_sessions if project_lower in s.get("project_dir", "").lower()]
 
-    # Progress HUD — channel per search query
     p_ctx = progress(f"search: {query}")
     p = p_ctx.__enter__()
-    p.update(f"Searching {len(all_sessions)} sessions...", icon="search")
-
-    # Bulk-load all cache files — cached across calls (30s TTL).
-    # Reading ~5000 × 1KB JSON files is ~500ms. Caching avoids this on
-    # back-to-back searches within a session.
-    cache_index = _get_cache_index()
-
-    # Build corpus-level BM25 statistics (IDF, avg doc lengths)
-    corpus = build_corpus_stats(cache_index)
-    p.update(f"BM25 index built, scanning...", icon="working")
+    p.update(f"Live scanning {len(hot_sessions)} hot sessions...", icon="search")
 
     def _check(s):
         sid = s["session_id"]
-        cached = cache_index.get(sid)
-
-        # ML pre-filter: skip automated sessions if not requested
-        if cached is not None and not include_automated:
-            if cached.get("classification") == "automated":
-                return None
-
-        # Fast path: use cached search_text (already lowercased plain text)
-        if cached is not None and cached.get("search_text"):
-            raw = cached["search_text"].encode("utf-8", errors="replace")
-            per_term_counts = []
-            for term in terms_bytes:
-                c = raw.count(term)
-                if c == 0:
-                    return None
-                per_term_counts.append(c)
-            total_count = sum(per_term_counts)
-            rarest_idx = per_term_counts.index(min(per_term_counts))
-            snippet = _extract_snippet(raw, terms_bytes[rarest_idx])
-            raw_len = len(raw)
-            return (s, total_count, snippet, raw_len)
-
-        # Slow path: read raw JSONL (fallback for uncached sessions)
         raw = _read_session_bytes(s)
         if raw is None:
             return None
@@ -449,81 +464,97 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         total_count = sum(per_term_counts)
         rarest_idx = per_term_counts.index(min(per_term_counts))
         snippet = _extract_snippet(raw, terms_bytes[rarest_idx])
-        raw_len = len(raw)
-        return (s, total_count, snippet, raw_len)
+        return (s, total_count, snippet)
 
-    # Stream progress as results come in — Perplexity-style
     from concurrent.futures import as_completed
 
-    matches = []
-    total = len(all_sessions)
+    hot_matches = []
+    total = len(hot_sessions)
     checked = 0
-    last_report = 0
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = {pool.submit(_check, s): s for s in all_sessions}
-        for future in as_completed(futures):
-            checked += 1
-            result = future.result()
-            if result is not None:
-                matches.append(result)
-            # Report every ~15% or every 200 sessions
-            pct = int((checked / total) * 100)
-            if pct >= last_report + 15 or checked == total:
-                last_report = pct
-                p.update(f"{checked}/{total} scanned, {len(matches)} matches so far", icon="working")
+    if hot_sessions:
+        with ThreadPoolExecutor(max_workers=min(8, max(1, len(hot_sessions)))) as pool:
+            futures = {pool.submit(_check, s): s for s in hot_sessions}
+            for future in as_completed(futures):
+                checked += 1
+                result = future.result()
+                if result is not None:
+                    hot_matches.append(result)
 
-    p.update(f"{len(matches)} matches from {total} sessions", icon="done")
-    if not matches:
-        p_ctx.__exit__(None, None, None)
-        return _empty
-
-    # BM25 scoring: summary-first with magnitude-based combination
-    scored = []
-    for item in matches:
-        s, total_count, snippet, raw_len = item
-        sid = s["session_id"]
-        cached = cache_index.get(sid)
-
-        final, _, _, _ = score_session(
-            query_tokens, cached, total_count, raw_len,
-            s["mtime"], corpus,
-        )
-
-        scored.append((s, total_count, snippet, final))
-
-    scored.sort(key=lambda x: x[3], reverse=True)
-    scored = scored[:limit]
-
-    p.update(f"Top {len(scored)} results scored", icon="done", highlight=True)
-    for s, total_count, snippet, final in scored[:5]:
-        title = s.get("title", s.get("session_id", "")[:30])
-        proj = shorten_path(s.get("project", ""))
-        p.result(title, f"{proj} | score {final:.0f} | {total_count} hits",
-                 session_id=s.get("session_id", ""))
-
-    results = [
+    hot_matches.sort(key=lambda x: (x[1], x[0]["mtime"]), reverse=True)
+    hot_results = [
         _session_row(s, {
-            "score": final,
+            "score": round(100.0 * math.exp(-0.0002 * max(now - s["mtime"], 0)), 1),
             "hits": total_count,
             "snippet": snippet,
-        }, cache_index=cache_index)
-        for s, total_count, snippet, final in scored
+            "source": "hot-live",
+        })
+        for s, total_count, snippet in hot_matches[:limit]
     ]
 
-    # L2 fallback: if BM25 found nothing, search project topic summaries.
-    # This catches business-context queries ("Wrike renewal") whose terms
-    # aren't in raw session text but ARE in AI-generated project summaries.
-    if not results:
-        l2_hits = _search_l2_topics(query_tokens, limit)
-        if l2_hits:
-            p.update(f"No session matches; found {len(l2_hits)} project topic(s)", icon="info")
-            results = l2_hits
+    remaining = max(limit - len(hot_results), 0)
+    cold_rows = []
+    if remaining:
+        p.update("Searching cold SQLite index...", icon="working")
+        cold_rows = search_cold_index(
+            query,
+            limit=remaining,
+            include_automated=include_automated,
+            cutoff_after=cutoff,
+            cutoff_before=hot_cutoff,
+            project=project,
+        )
+
+    cold_results = []
+    for row in cold_rows:
+        cold_results.append({
+            "id": row["session_id"],
+            "project": shorten_path(row.get("project_dir") or ""),
+            "date": datetime.fromtimestamp(row["mtime"]).strftime("%Y-%m-%d %H:%M"),
+            "title": row.get("title") or "",
+            "health": round(float(row.get("score") or 0.0), 0),
+            "score": round(abs(float(row.get("rank") or 0.0)), 3),
+            "hits": None,
+            "snippet": row.get("state") or "",
+            "source": "cold-index",
+        })
+
+    results = hot_results + cold_results
+
+    p.update(f"{len(hot_results)} hot + {len(cold_results)} indexed results", icon="done")
 
     time.sleep(0.1)  # let socket flush before closing
     p_ctx.__exit__(None, None, None)
 
-    return {"items": results, "count": len(results)}
+    return {
+        "items": results,
+        "count": len(results),
+        "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
+        "cold_index": search_index_status(),
+    }
+
+
+@mcp.tool()
+def session_search_index_status() -> dict:
+    """Return cold search index status without scanning session files."""
+    return search_index_status()
+
+
+@mcp.tool()
+def session_search_index_refresh(max_files: int = 200, max_seconds: float = 0.25) -> dict:
+    """Index a small cold-search batch without hammering the computer.
+
+    This is intentionally budgeted. Repeated calls slowly move the cursor
+    through ~/.claude/resume-summaries while search itself stays responsive.
+    """
+    max_files = max(1, min(max_files, 2000))
+    max_seconds = max(0.05, min(max_seconds, 2.0))
+    result = refresh_search_index_budget(
+        max_files=max_files,
+        max_seconds=max_seconds,
+        hot_window_seconds=HOT_WINDOW_SECONDS,
+    )
+    return {**result, "status": search_index_status()}
 
 
 @mcp.tool()
@@ -1962,24 +1993,29 @@ def _trace_merges(session_file: Path, chain: list, visited: set) -> None:
             _trace_merges(s["file"], chain, visited)
 
 
-# Register data science tools on the same MCP instance (optional — requires scipy/sklearn)
-try:
-    from .data_science.mcp_tools import register_tools as _register_ds_tools
-    _register_ds_tools(mcp)
-except Exception:
-    # Fallback: register stub tools that explain missing deps
-    _DS_TOOLS = ["session_insights", "session_xray", "session_report", "session_data_science"]
-    for _tool_name in _DS_TOOLS:
+def _register_data_science_stubs(mcp_instance) -> None:
+    """Register data-science placeholder tools when optional deps are absent."""
+    ds_tools = ["session_insights", "session_xray", "session_report", "session_data_science"]
+
+    for tool_name in ds_tools:
         def _make_stub(name):
-            @mcp.tool(name=name)
-            def _stub(**kwargs) -> dict:
+            @mcp_instance.tool(name=name)
+            def _stub() -> dict:
                 return {
                     "error": f"'{name}' requires optional dependencies. Install with: pip install resume-resume[train]",
                     "install_cmd": "pip install resume-resume[train]",
                     "missing": "scipy, scikit-learn, pandas",
                 }
             return _stub
-        _make_stub(_tool_name)
+        _make_stub(tool_name)
+
+
+# Register data science tools on the same MCP instance (optional — requires scipy/sklearn)
+try:
+    from .data_science.mcp_tools import register_tools as _register_ds_tools
+    _register_ds_tools(mcp)
+except Exception:
+    _register_data_science_stubs(mcp)
 
 # Register L2/L3 project summary tools (requires insights.db from commons daemon)
 try:

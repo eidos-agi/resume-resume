@@ -23,12 +23,15 @@ local = [
 ]
 train = [
     "pandas",
+    "scipy",
     "scikit-learn",
 ]
 
 [project.scripts]
 resume-resume = "resume_resume.cli:main"
 resume-resume-mcp = "resume_resume.mcp_server:main"
+resume-card = "resume_resume.resume_card:main"
+resume-site = "resume_resume.site_server:main"
 cr = "resume_resume.cli:main"
 
 [tool.setuptools.packages.find]
