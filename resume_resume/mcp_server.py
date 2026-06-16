@@ -28,7 +28,7 @@ from .sessions import (
     PROJECTS_DIR,
 )
 from claude_session_commons import decode_project_path
-from claude_session_commons.codex import CODEX_SESSIONS_DIR, _read_codex_cwd
+from claude_session_commons.codex import CODEX_SESSIONS_DIR, _read_codex_cwd, session_tool
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
 from .progress import progress
 from .search_index import HOT_WINDOW_SECONDS
@@ -263,6 +263,7 @@ def _get_title(session_id: str, session_file: Path) -> str:
     return summary.get("title", "") if isinstance(summary, dict) else ""
 
 
+from .session_utils import resume_command
 from .session_utils import session_duration_hours as _session_duration_hours
 
 
@@ -582,6 +583,8 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         })
 
     results = hot_results + cold_results
+    for item in results:
+        item["tool"] = session_tool(item["id"])  # "claude" | "codex"
 
     p.update(f"{len(hot_results)} hot + {len(cold_results)} indexed results", icon="done")
 
@@ -662,6 +665,26 @@ def _read_messages(session_file: Path, keyword: str, limit: int) -> dict:
                 if not isinstance(entry, dict):
                     continue
                 entry_type = entry.get("type")
+
+                # Codex schema: event_msg with payload.{user_message,agent_message}.
+                # Map to the same {role, text} shape as Claude user/assistant entries
+                # so cross-tool merge_context works on Codex sessions too.
+                if entry_type == "event_msg":
+                    payload = entry.get("payload") or {}
+                    ptype = payload.get("type")
+                    if ptype == "user_message":
+                        role, content = "user", payload.get("message", "")
+                    elif ptype == "agent_message":
+                        role, content = "assistant", payload.get("message", "")
+                    else:
+                        continue
+                    if not isinstance(content, str) or not content.strip():
+                        continue
+                    if keyword_lower and keyword_lower not in content.lower():
+                        continue
+                    messages.append({"role": role, "text": _trunc(content)})
+                    continue
+
                 if entry_type not in ("user", "assistant"):
                     continue
 
@@ -1487,9 +1510,7 @@ def resume_in_terminal(session_id: str, fork: bool = False) -> dict:
     project_dir = session["project_dir"]
     title = _get_title(session_id, session["file"]) or project_dir
 
-    cmd = f"claude --resume {session_id}"
-    if fork:
-        cmd += " --fork-session"
+    cmd = resume_command(session_id, fork=fork)
 
     err = _launch_terminal(project_dir, cmd)
     if err:

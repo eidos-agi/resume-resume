@@ -22,6 +22,7 @@ from claude_session_commons import decode_project_path
 
 from .sessions import PROJECTS_DIR, SessionCache, relative_time, shorten_path
 from .search_index import recent_candidates
+from .session_utils import resume_command
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
@@ -288,7 +289,7 @@ def build_card(
     title = str(summary.get("title") or "").splitlines()
     title_text = title[0].strip() if title else ""
     project_dir = str(session.get("project_dir") or "")
-    command = f"claude --resume {session['session_id']}"
+    command = resume_command(session["session_id"])
 
     return {
         "session_id": session["session_id"],

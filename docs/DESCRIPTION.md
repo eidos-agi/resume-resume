@@ -20,6 +20,8 @@ resume-resume is two things in one package:
 
 The TUI is what you use when you sit down at your machine after a crash. The MCP server is what Claude uses to move context between sessions while you're working. Together, they turn Claude Code's flat pile of JSONL files into a navigable, searchable, composable session graph.
 
+This now extends beyond Claude Code: resume-resume also discovers and indexes **Codex CLI** sessions (`~/.codex/sessions/`), so a single search reaches across both agentic CLIs. Everything below describes Claude Code, but the same discovery, search, and resume machinery applies to Codex sessions.
+
 ## Why It Was Built
 
 ### The Crash Recovery Problem

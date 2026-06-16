@@ -482,16 +482,46 @@ def _find_session_project(session_id: str) -> str | None:
     return None
 
 
-def _parse_resume_args(argv: list[str]) -> tuple[str | None, list[str]]:
-    """Parse a pasted claude command into (session_id, extra_flags).
+def _find_codex_project(session_id: str) -> str | None:
+    """Find the cwd recorded in a Codex rollout's session_meta.
+
+    Accepts either a full rollout id or a bare conversation UUID.
+    """
+    from claude_session_commons.codex import (
+        CODEX_SESSIONS_DIR,
+        _read_codex_cwd,
+        codex_session_uuid,
+    )
+
+    target = codex_session_uuid(session_id)
+    if not CODEX_SESSIONS_DIR.exists():
+        return None
+    for f in CODEX_SESSIONS_DIR.glob("**/rollout-*.jsonl"):
+        if target in f.stem:
+            return _read_codex_cwd(f) or None
+    return None
+
+
+def _parse_resume_args(argv: list[str]) -> tuple[str | None, list[str], bool, str]:
+    """Parse a pasted resume command into (session_id, extra_flags, is_codex, verb).
 
     Handles:  cr claude --resume <id> --model opus --chrome
               cr --resume <id>
-              cr <bare-uuid>
+              cr <bare-uuid>              (Claude Code)
+              cr codex resume <uuid>      (Codex)
+              cr codex fork <uuid>
+              cr <rollout-...>            (Codex, full session id)
     """
     args = list(argv)
+    is_codex = False
+    verb = "resume"
     if args and args[0] == "claude":
         args.pop(0)
+    elif args and args[0] == "codex":
+        is_codex = True
+        args.pop(0)
+        if args and args[0] in ("resume", "fork"):
+            verb = args.pop(0)
 
     session_id = None
     extra = []
@@ -504,17 +534,19 @@ def _parse_resume_args(argv: list[str]) -> tuple[str | None, list[str]]:
         if arg == "--resume" and i + 1 < len(args):
             session_id = args[i + 1]
             skip_next = True
-        elif session_id is None and UUID_RE.match(arg):
+        elif session_id is None and (UUID_RE.match(arg) or arg.startswith("rollout-")):
             session_id = arg
         else:
             extra.append(arg)
 
-    return session_id, extra
+    if session_id and session_id.startswith("rollout-"):
+        is_codex = True
+    return session_id, extra, is_codex, verb
 
 
 def _resume_from_paste(argv: list[str]):
-    """cr claude --resume <id> [flags] — find cwd, add defaults, show proof, launch."""
-    session_id, extra_flags = _parse_resume_args(argv)
+    """cr <claude|codex resume> <id> [flags] — find cwd, add defaults, show proof, launch."""
+    session_id, extra_flags, is_codex, verb = _parse_resume_args(argv)
 
     if session_id is None:
         print(f"  \033[31m✗ No session ID found in: {' '.join(argv)}\033[0m")
@@ -523,28 +555,39 @@ def _resume_from_paste(argv: list[str]):
     print()
     print(f"  🔍 Searching for session {session_id}...")
 
-    project_path = _find_session_project(session_id)
-    if project_path is None:
-        print(f"  \033[31m✗ Session not found in any project directory\033[0m")
-        sys.exit(1)
+    if is_codex:
+        from claude_session_commons.codex import codex_session_uuid
 
-    if not os.path.isdir(project_path):
-        print(f"  \033[31m✗ Resolved path does not exist: {project_path}\033[0m")
-        sys.exit(1)
-
-    # Build command: always ensure defaults
-    cmd = ["claude", "--resume", session_id]
-    if "--dangerously-skip-permissions" not in extra_flags:
-        cmd.append("--dangerously-skip-permissions")
-    if "--enable-auto-mode" not in extra_flags:
-        cmd.append("--enable-auto-mode")
-    cmd.extend(extra_flags)
+        uuid = codex_session_uuid(session_id)
+        # Codex resumes by UUID regardless of cwd, but it operates in the
+        # working dir — cd to the recorded cwd when we can find it.
+        project_path = _find_codex_project(session_id)
+        cmd = ["codex", verb, uuid, *extra_flags]
+        binary = "codex"
+        title = "cr — Codex Resume"
+    else:
+        project_path = _find_session_project(session_id)
+        if project_path is None:
+            print(f"  \033[31m✗ Session not found in any project directory\033[0m")
+            sys.exit(1)
+        if not os.path.isdir(project_path):
+            print(f"  \033[31m✗ Resolved path does not exist: {project_path}\033[0m")
+            sys.exit(1)
+        cmd = ["claude", "--resume", session_id]
+        if "--dangerously-skip-permissions" not in extra_flags:
+            cmd.append("--dangerously-skip-permissions")
+        if "--enable-auto-mode" not in extra_flags:
+            cmd.append("--enable-auto-mode")
+        cmd.extend(extra_flags)
+        binary = "claude"
+        title = "cr — Claude Resume"
 
     cmd_str = " ".join(cmd)
-    project_name = os.path.basename(project_path)
+    cwd_display = project_path or "(current dir — cwd not recorded)"
+    project_name = os.path.basename(project_path) if project_path else "current dir"
 
     print(f"  \033[32m✓ Found!\033[0m")
-    print(f"  \033[90mResolved cwd: {project_path}\033[0m")
+    print(f"  \033[90mResolved cwd: {cwd_display}\033[0m")
     print()
     print(f"  \033[36m→\033[0m Resuming in \033[1m{project_name}\033[0m")
     print(f"  \033[90m{cmd_str}\033[0m")
@@ -553,17 +596,18 @@ def _resume_from_paste(argv: list[str]):
     # macOS dialog — visible proof outside the TUI
     dialog_msg = (
         f"✓ Session: {session_id[:8]}…\\n"
-        f"📂 cwd: {project_path}\\n\\n"
+        f"📂 cwd: {cwd_display}\\n\\n"
         f"{cmd_str}"
     )
     subprocess.Popen([
         "osascript", "-e",
         f'tell application "System Events" to display dialog "{dialog_msg}" '
-        f'with title "cr — Claude Resume" buttons {{"OK"}} default button "OK" giving up after 5'
+        f'with title "{title}" buttons {{"OK"}} default button "OK" giving up after 5'
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    os.chdir(project_path)
-    os.execvp("claude", cmd)
+    if project_path and os.path.isdir(project_path):
+        os.chdir(project_path)
+    os.execvp(binary, cmd)
 
 
 def main():
@@ -571,7 +615,8 @@ def main():
     if len(sys.argv) > 1 and (
         "--resume" in sys.argv
         or (len(sys.argv) == 2 and UUID_RE.match(sys.argv[1]))
-        or (sys.argv[1] == "claude")
+        or sys.argv[1] in ("claude", "codex")
+        or (len(sys.argv) == 2 and sys.argv[1].startswith("rollout-"))
     ):
         _resume_from_paste(sys.argv[1:])
         sys.exit(0)
