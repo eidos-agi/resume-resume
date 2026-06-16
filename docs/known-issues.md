@@ -42,6 +42,22 @@ truth instead of rediscovering the same problems every run.
 - **Test:** `tests/test_perf_regression.py::test_dirty_repos_cold_under_generous_ceiling`
   and `test_dirty_repos_cached_is_dramatically_faster_than_cold`
 
+### perf-004: broad single-token query latency (~50ms) — NOT bm25-bound, do not re-propose skip-bm25
+
+- **Severity:** ★ (paper cut; rare in practice)
+- **Evidence:** A lone ultra-common token matching ~all docs costs ~50ms
+  (`code` = 12,361 matches → 56ms; `session` = 12,762 → 63ms). Narrow /
+  multi-term / phrase queries are 2–11ms.
+- **Disproven fix:** Skipping `bm25()` ranking for broad lone tokens
+  (`ORDER BY s.mtime DESC` instead) was implemented and **measured at 1.0–1.2x
+  — i.e. no help** (`code`: 56.5ms with bm25 vs 54.9ms without). The cost is
+  the FTS5 posting scan + JOIN over every matching row, **not** ranking. The
+  guard was reverted. Do not re-propose it.
+- **Reality:** ~50ms to enumerate 12k matches is inherent FTS behaviour and
+  fine — a single ultra-common word is not a useful search. Real win, if ever
+  needed, is bounding match enumeration (e.g. a recency-scoped secondary FTS),
+  not touching the ranking expression.
+
 ### perf-002: `recent_sessions` is slow (FIXED 7b2d2d4)
 
 - Fixed. 10-second TTL cache. Cold path still ~1200ms (upstream
@@ -68,6 +84,45 @@ truth instead of rediscovering the same problems every run.
   with `{"full_new_text": ...`. Approval would have silently failed with
   `apply_error` set. Fixed by `_coerce_diff` which best-effort
   json-decodes strings that look like JSON before dispatching.
+
+### correctness-003: same-day sessions invisible (index-freshness gap) (FIXED 31d8419)
+
+- **Severity:** ★★★ (was user-visible — a same-day Codex session
+  "nevereatalone" was unfindable by keyword)
+- **Why it mattered:** A session newer than the 30-min hot window but not yet
+  appended to the daemon `SessionIndex` (and therefore absent from the cold
+  FTS index too) fell into a gap and was invisible to both search tiers.
+- **Fix:** `mcp_server._fresh_sessions()` supplements the live hot scan with a
+  bounded (6h window, cap 200) filesystem scan of fresh-but-unindexed sessions,
+  so same-day sessions are findable without waiting for a background ingestion
+  pass. The filesystem scan uses `find_all_sessions`, which discovers both
+  `~/.claude/projects` and `~/.codex/sessions`.
+- **Test:** `tests/test_index_freshness.py`
+
+### correctness-004: Codex CLI sessions now indexed alongside Claude Code
+
+- **Severity:** N/A (feature, documented for future agents)
+- **What:** `claude-session-commons` discovery + parse now handle Codex rollout
+  files (`~/.codex/sessions/**/rollout-*.jsonl`, `event_msg`/`response_item`
+  schema) and emit the same `(context, search_text)` shape as Claude sessions,
+  so all search/recent/digest tools cover both tools transparently.
+- **Note:** `search_text` is stored untruncated — a 64KB head+tail cap was
+  tried and reverted because it traded search recall for an index-size win that
+  wasn't needed (and gave no latency benefit; see perf-004).
+- **Resume:** Codex sessions resume via `resume_in_terminal` / TUI / cards /
+  the `cr` CLI (`cr codex resume <uuid>`, `cr <rollout-id>`), all of which emit
+  `codex resume <uuid>` (UUID extracted from the rollout stem) and cd to the
+  session's recorded cwd. `session_utils.resume_command()` is the single source
+  of truth for resume-command construction across sources.
+  Tests: `tests/test_resume_command.py`.
+- **Cross-tool context merge:** `merge_context` now works on Codex sessions in
+  all modes. `_read_messages` maps Codex `event_msg`/`user_message` and
+  `agent_message` entries to the same `{role, text}` shape as Claude
+  user/assistant entries — so you can pull Codex research into a Claude session
+  (and vice versa). Test: `tests/test_codex_crosstool.py`.
+- **Source labeling:** `search_sessions` items carry a `tool` field
+  (`"claude"` | `"codex"`, via `session_tool()`) so mixed results are
+  distinguishable.
 
 ### correctness-002: `self_*` list tools used to return bare lists (FIXED 29d2f73)
 

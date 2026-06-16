@@ -15,13 +15,13 @@
 | **Prioritize** | Auto-ranks sessions and repos by urgency — dirty files don't age out, recent active work surfaces first. |
 | **Speed** | Parallelized BM25 search across gigabytes of past chats in seconds. Parallel git status scans across 50+ repos. |
 | **Cost Savings** | Uses Haiku to summarize past context once, then caches permanently — searching thousands of sessions costs nothing after first run. |
-| **Merge** | Merge multiple old chats together, pulling context across sessions into a single conversation. |
+| **Merge** | Merge multiple old chats together, pulling context across sessions into a single conversation — **including across tools**: bridge Codex research into a Claude Code session and vice versa. |
 
 ---
 
 ## MCP Server
 
-Add it to Claude Code and every session on your machine can search, read, and merge your full session history — in plain English.
+Add it to Claude Code and every session on your machine can search, read, and merge your full session history — in plain English. Indexes **both Claude Code and Codex CLI** sessions, so one query reaches across both tools.
 
 ```bash
 pip install resume-resume
@@ -101,6 +101,8 @@ What it does:
 
 No more "No conversation found" errors from being in the wrong folder.
 
+> The `cr` paste command parses `claude --resume` lines, so it's Claude Code only. Resuming a Codex session works through the MCP `resume_in_terminal` tool and the TUI/cards, which emit `codex resume <uuid>` and cd to the session's recorded cwd.
+
 ---
 
 ## TUI
@@ -134,7 +136,7 @@ Requires Python 3.11+ and [Claude Code](https://docs.anthropic.com/en/docs/claud
 
 ## How It Works
 
-1. Scans `~/.claude/projects/` for JSONL session files
+1. Scans `~/.claude/projects/` (Claude Code) and `~/.codex/sessions/` (Codex CLI) for JSONL session files
 2. Scans all project directories for dirty git state (parallel `git status --porcelain`)
 3. Scores sessions by urgency: session recency (2h half-life) + repo dirty urgency (file count + dirty file recency)
 4. Dirty repos bypass age filters — uncommitted work doesn't age out

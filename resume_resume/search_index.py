@@ -266,7 +266,10 @@ def _fts_query(query: str) -> str:
     remaining = re.sub(r'"[^"]*"', "", query)
     words = [t.replace('"', "") for t in remaining.lower().split() if t.strip()]
     tokens = [t for t in [*phrases, *words] if t]
-    return " AND ".join(f'"{t}"' for t in tokens)
+    # Join with OR so a query is tolerant of missing words: a session need not
+    # contain every term to match. bm25() ranking (see search()) naturally floats
+    # sessions matching more query terms to the top.
+    return " OR ".join(f'"{t}"' for t in tokens)
 
 
 def search(
