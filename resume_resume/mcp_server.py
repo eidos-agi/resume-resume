@@ -28,6 +28,7 @@ from .sessions import (
     PROJECTS_DIR,
 )
 from claude_session_commons import decode_project_path
+from claude_session_commons.codex import CODEX_SESSIONS_DIR, _read_codex_cwd
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
 from .progress import progress
 from .search_index import HOT_WINDOW_SECONDS
@@ -42,6 +43,10 @@ _cache = SessionCache()
 
 _TRUNC = 300  # max chars per message/field
 _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+# Codex CLI session ids look like rollout-<ISO-ts>-<uuid>. Accept those too.
+# Kept strict (only word chars, hyphens, colons) to preserve glob-injection
+# safety — no '*', '?', '[', ']', or path separators can reach a glob pattern.
+_CODEX_ID_RE = re.compile(r"rollout-[0-9A-Za-z:\-]+")
 
 # Cached wrapper for find_all_sessions — the shared bottleneck across
 # search_sessions, dirty_repos, and boot_up. Each call scans the filesystem
@@ -180,19 +185,37 @@ def _summary_valid(summary: dict) -> bool:
 
 
 def _find_session(session_id: str) -> dict | None:
-    """Find a session by targeted glob — O(1) dirs, not O(N) sessions."""
-    # Validate UUID format to prevent glob injection (* ? [] etc)
-    if not _UUID_RE.fullmatch(session_id):
+    """Find a session by targeted glob — O(dirs), not O(N) sessions.
+
+    Resolves both Claude-Code sessions (~/.claude/projects/*/<uuid>.jsonl)
+    and Codex CLI sessions (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl).
+    The codex tree is date-partitioned, so a recursive glob on the id stays
+    O(date dirs) rather than scanning every session file.
+    """
+    is_codex = bool(_CODEX_ID_RE.fullmatch(session_id))
+    # Validate id format to prevent glob injection (* ? [] / etc). Only bare
+    # UUIDs or rollout-* ids reach a glob pattern.
+    if not is_codex and not _UUID_RE.fullmatch(session_id):
         return None
-    matches = list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl"))
+
+    if is_codex:
+        matches = list(CODEX_SESSIONS_DIR.glob(f"**/{session_id}.jsonl"))
+    else:
+        matches = list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl"))
     if not matches:
         return None
     f = matches[0]
     stat = f.stat()
+    if is_codex:
+        # Match how scan_codex_sessions labels project_dir: the cwd recorded
+        # in the line-1 session_meta payload.
+        project_dir = _read_codex_cwd(f)
+    else:
+        project_dir = decode_project_path(f.parent.name)
     return {
         "file": f,
         "session_id": session_id,
-        "project_dir": decode_project_path(f.parent.name),
+        "project_dir": project_dir,
         "mtime": stat.st_mtime,
         "size": stat.st_size,
     }
@@ -611,7 +634,7 @@ def read_session(
     limit = max(1, min(limit, 30))
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     result = _read_messages(session["file"], keyword, limit)
     result["id"] = session_id
@@ -758,7 +781,7 @@ def session_summary(session_id: str, force_regenerate: bool = False,
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     session_file = session["file"]
     ck = _cache.cache_key(session_file)
@@ -1459,7 +1482,7 @@ def resume_in_terminal(session_id: str, fork: bool = False) -> dict:
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     project_dir = session["project_dir"]
     title = _get_title(session_id, session["file"]) or project_dir
@@ -1503,7 +1526,7 @@ def merge_context(
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     message_limit = max(2, min(message_limit, 20))
     project = shorten_path(session["project_dir"])
@@ -1663,7 +1686,7 @@ def session_timeline(
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     limit = max(10, min(limit, 200))
     needs_full_scan = focus == "even" or after or before
@@ -1921,7 +1944,7 @@ def session_thread(session_id: str) -> dict:
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     bookmarks_dir = Path.home() / ".claude" / "bookmarks"
     all_bookmarks = {}
