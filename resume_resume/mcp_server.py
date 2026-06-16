@@ -135,6 +135,30 @@ def _hot_sessions(window_seconds: int = HOT_WINDOW_SECONDS) -> list[dict]:
     return sessions
 
 
+# ponytail: 6h freshness window. A session newer than the 30-min hot window but
+# not yet in the daemon's append-only SessionIndex (and therefore not in the
+# cold FTS index either) is invisible to both search tiers — the gap that hid
+# the same-day "nevereatalone" codex session. _fresh_sessions closes it with a
+# real filesystem scan (the cached find_all_sessions, which DOES discover
+# ~/.codex/sessions), capped so the supplemental live scan stays bounded.
+_FRESH_WINDOW_SECONDS = 6 * 60 * 60
+
+
+def _fresh_sessions(cutoff_after: float = 0.0) -> list[dict]:
+    """Recently-modified sessions from the filesystem, regardless of index state.
+
+    Catches sessions written but not yet appended to SessionIndex / ingested
+    into the cold index. Bounded by _FRESH_WINDOW_SECONDS and capped at 200 so
+    a search never turns into an unbounded scan of every fresh file.
+    """
+    floor = time.time() - _FRESH_WINDOW_SECONDS
+    if cutoff_after:
+        floor = max(floor, cutoff_after)
+    fresh = [s for s in _find_all_sessions_cached() if s["mtime"] >= floor]
+    fresh.sort(key=lambda s: s["mtime"], reverse=True)
+    return fresh[:200]  # ponytail: cap supplemental scan
+
+
 def _summary_valid(summary: dict) -> bool:
     """Reject cached summaries that are garbage (XML blobs, fragments, etc.)."""
     if not isinstance(summary, dict):
@@ -437,8 +461,17 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
     if hours > 0:
         cutoff = now - hours * 3600
 
-    # Hot path: only sessions touched in the last 30 minutes are scanned live.
-    hot_sessions = _hot_sessions()
+    # Hot path: sessions touched in the last 30 minutes are scanned live. We
+    # also fold in fresh-but-unindexed sessions (newer than the hot window but
+    # not yet in the daemon index or cold FTS) so same-day sessions are never
+    # invisible while waiting for a background ingestion pass.
+    hot_sessions = list(_hot_sessions())
+    seen_ids = {s["session_id"] for s in hot_sessions}
+    for s in _fresh_sessions(cutoff_after=cutoff):
+        if s["session_id"] not in seen_ids:
+            hot_sessions.append(s)
+            seen_ids.add(s["session_id"])
+
     if cutoff:
         hot_sessions = [s for s in hot_sessions if s["mtime"] >= cutoff]
 
@@ -505,8 +538,14 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
             project=project,
         )
 
+    # The live scan now reaches back further than the cold cutoff, so a fresh
+    # session can surface in both tiers. Prefer the hot-live hit and drop the
+    # cold duplicate.
+    hot_ids = {r["id"] for r in hot_results}
     cold_results = []
     for row in cold_rows:
+        if row["session_id"] in hot_ids:
+            continue
         cold_results.append({
             "id": row["session_id"],
             "project": shorten_path(row.get("project_dir") or ""),
