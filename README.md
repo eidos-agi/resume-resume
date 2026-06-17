@@ -81,9 +81,31 @@ Two sessions — one about eidos-philosophy doc changes (Mar 14) and one with a 
 
 ---
 
-## Quick Resume — Paste & Go
+## How to Resume
 
-`claude --resume <id>` fails if you're in the wrong directory. `cr` fixes that — paste any claude command and it auto-discovers the correct project directory, ensures the right flags are on, and launches.
+Three ways, fastest first.
+
+### 1. Paste box — just run `cr`
+
+Run `cr` with no arguments and it shows a paste box **before** the session list. Paste anything and press Enter:
+
+```
+📋 Paste a resume command, session id, or chat text — or press Enter for the list:
+›
+```
+
+| What you paste | What happens |
+|---|---|
+| A resume command (`cd … && claude --resume <id>`) | Extracts the id, resolves the cwd, launches |
+| A bare session id | Same — finds the project, launches |
+| **Raw chat text** — anything you copied off the screen of a dead session | Full-text-scans every session, finds the one that text came from, opens it |
+| Nothing (just Enter) | Falls through to the normal session list |
+
+The third one is the point: your session crashed, the terminal still shows the last thing on screen, you copy a chunk of it, run `cr`, paste. It finds the chat and reopens it — no id, no hunting.
+
+### 2. Paste a command directly as an argument
+
+`claude --resume <id>` fails if you're in the wrong directory. `cr` fixes that — auto-discovers the project, ensures the right flags, and launches.
 
 ```bash
 cr claude --resume ddf7fc98-6c93-40c8-9444-503d8a716dbf
@@ -91,17 +113,38 @@ cr claude --resume ddf7fc98-6c93-40c8-9444-503d8a716dbf --model opus --chrome
 cr ddf7fc98-6c93-40c8-9444-503d8a716dbf
 ```
 
-What it does:
-1. Parses the session ID out of whatever you pasted
-2. Searches `~/.claude/projects/*/` to find which project owns that session
-3. Resolves the encoded directory name back to a real filesystem path
-4. Adds `--dangerously-skip-permissions` and `--enable-auto-mode` if not already present
-5. Pops a macOS dialog showing the session, resolved cwd, and full command (proof it worked — visible outside the TUI)
-6. `cd`s to the correct directory and `exec`s into Claude
+It parses the id out of whatever you pasted, searches `~/.claude/projects/*/` for the owning project, resolves the encoded directory back to a real path, adds `--dangerously-skip-permissions` / `--enable-auto-mode` if missing, shows a proof dialog, then `cd`s and `exec`s into Claude. No more "No conversation found" from the wrong folder.
 
-No more "No conversation found" errors from being in the wrong folder.
+### 3. The TUI list
 
-> The `cr` paste command parses `claude --resume` lines, so it's Claude Code only. Resuming a Codex session works through the MCP `resume_in_terminal` tool and the TUI/cards, which emit `codex resume <uuid>` and cd to the session's recorded cwd.
+`cr` after a blank paste, or `cr 24` / `cr --all` — see [TUI](#tui) below.
+
+> Paste-to-resume parses `claude --resume` lines and Claude Code session text, so it's Claude Code only. Resuming a Codex session works through the MCP `resume_in_terminal` tool and the TUI/cards, which emit `codex resume <uuid>` and cd to the session's recorded cwd.
+
+### How paste-to-find works
+
+When you paste chat text (no id), `cr` does a **full-text raw scan of every session file** — not the summary index, which only holds titles. It ranks each session by *in-order n-gram coverage*: the fraction of your paste's word-chunks that appear verbatim, after normalizing away markdown, em-dashes, smart/escaped quotes, and terminal wrapping. The best match above a calibrated threshold (0.25) is opened; below it, you get the list. It also skips the session you're currently in (`CLAUDE_CODE_SESSION_ID`) — you don't resume the chat you're sitting in.
+
+**Measured results** (180-trial calibration + adversarial batch, driven through [emux](https://github.com/eidos-agi/emux)/tmux):
+
+| Input | Result |
+|---|---|
+| Verbatim text from a past session | **100%** found (35/35 clean snippets) |
+| Realistic terminal paste (UI chrome, wrapping, a truncated first line) | **86%** auto-open the right chat |
+| Wrong chat opened | **0%** — never; in-order matching can't false-positive |
+| Decoys (shuffled vocab, unrelated text) | **0 false positives** — scores max out at 0.00 |
+| When unsure | Falls through to the list — safe by design, never a misfire |
+
+**Speed** — measured over a real local corpus (**328 chats · ~40M tokens · 166 MB**, warm page cache, 71 scans):
+
+| | latency |
+|---|---|
+| min | 0.8 s |
+| p50 | 5.5 s |
+| p95 | 7.5 s |
+| p99 | 7.9 s |
+
+Each paste re-scans every session file from disk; an anchor pre-filter skips files that can't match (best case ~0.8 s). There's no persistent index yet — so the cost scales with corpus size. (The separate BM25 *summary* index used by `search_sessions` is much smaller and searches thousands of sessions in ~3 s.)
 
 ---
 
