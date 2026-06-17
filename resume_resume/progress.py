@@ -40,13 +40,17 @@ class _ProgressChannel:
         self._sock = sock
 
     def update(self, text: str, icon: str = "info", highlight: bool = False):
-        self._send({"channel": self._ch, "text": text, "icon": icon, "highlight": highlight})
+        self._send(
+            {"channel": self._ch, "text": text, "icon": icon, "highlight": highlight}
+        )
 
     def result(self, title: str, meta: str, session_id: str = ""):
-        self._send({
-            "channel": self._ch,
-            "result": {"title": title, "meta": meta, "session_id": session_id},
-        })
+        self._send(
+            {
+                "channel": self._ch,
+                "result": {"title": title, "meta": meta, "session_id": session_id},
+            }
+        )
 
     def clear(self):
         self._send({"channel": self._ch, "clear": True})

@@ -16,6 +16,7 @@ def register_l2_tools(mcp_instance):
 
     def _get_conn():
         from claude_session_commons.insights import get_db
+
         return get_db()
 
     @mcp_instance.tool()
@@ -55,15 +56,17 @@ def register_l2_tools(mcp_instance):
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            topics.append({
-                "topic": summary.get("topic_name", r[1]),
-                "status": summary.get("status", ""),
-                "narrative": summary.get("narrative", ""),
-                "key_decisions": summary.get("key_decisions", []),
-                "open_threads": summary.get("open_threads", []),
-                "session_count": len(source_ids),
-                "updated_at": r[4],
-            })
+            topics.append(
+                {
+                    "topic": summary.get("topic_name", r[1]),
+                    "status": summary.get("status", ""),
+                    "narrative": summary.get("narrative", ""),
+                    "key_decisions": summary.get("key_decisions", []),
+                    "open_threads": summary.get("open_threads", []),
+                    "session_count": len(source_ids),
+                    "updated_at": r[4],
+                }
+            )
 
         project_name = Path(project_path).name
         return {
@@ -83,6 +86,7 @@ def register_l2_tools(mcp_instance):
         conn = _get_conn()
 
         from claude_session_commons.insights import list_projects as _list_projects
+
         projects = _list_projects(conn, limit=limit)
 
         # Annotate with L2 availability
@@ -97,13 +101,15 @@ def register_l2_tools(mcp_instance):
 
         result = []
         for p in projects:
-            result.append({
-                "name": p["name"],
-                "path": p["path"],
-                "session_count": p["session_count"],
-                "last_activity": p["last_activity"],
-                "has_l2": p["path"] in l2_projects,
-            })
+            result.append(
+                {
+                    "name": p["name"],
+                    "path": p["path"],
+                    "session_count": p["session_count"],
+                    "last_activity": p["last_activity"],
+                    "has_l2": p["path"] in l2_projects,
+                }
+            )
         return result
 
     @mcp_instance.tool()
@@ -143,11 +149,13 @@ def register_l2_tools(mcp_instance):
                     s = json.loads(r[1]) if isinstance(r[1], str) else r[1]
                 except (json.JSONDecodeError, TypeError):
                     s = {}
-                topics.append({
-                    "topic": s.get("topic_name", r[0]),
-                    "status": s.get("status", ""),
-                    "open_threads": s.get("open_threads", []),
-                })
+                topics.append(
+                    {
+                        "topic": s.get("topic_name", r[0]),
+                        "status": s.get("status", ""),
+                        "open_threads": s.get("open_threads", []),
+                    }
+                )
             result["topics"] = topics
             result["l2_updated"] = rows[0][2]
             p.update(f"Found {len(topics)} topics", icon="done")
@@ -164,14 +172,20 @@ def register_l2_tools(mcp_instance):
             try:
                 git_status = subprocess.run(
                     ["git", "status", "--porcelain"],
-                    cwd=project_path, capture_output=True, text=True, timeout=5,
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 lines = [l for l in git_status.stdout.strip().split("\n") if l]
                 result["git_dirty"] = len(lines) > 0
                 result["git_dirty_count"] = len(lines)
                 git_branch = subprocess.run(
                     ["git", "branch", "--show-current"],
-                    cwd=project_path, capture_output=True, text=True, timeout=5,
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 result["git_branch"] = git_branch.stdout.strip()
                 dirty_msg = f"{len(lines)} dirty files" if lines else "clean"
@@ -198,7 +212,9 @@ def register_l2_tools(mcp_instance):
                         latest_bookmark = {
                             "state": data.get("lifecycle_state", "unknown"),
                             "summary": data.get("context", {}).get("summary", ""),
-                            "next_actions": data.get("context", {}).get("next_actions", []),
+                            "next_actions": data.get("context", {}).get(
+                                "next_actions", []
+                            ),
                             "blockers": data.get("context", {}).get("blockers", []),
                             "confidence": data.get("context", {}).get("confidence", ""),
                         }

@@ -18,7 +18,6 @@ Navigation:
 """
 
 import json
-import os
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -43,8 +42,8 @@ import re
 def _clean_title(title: str) -> str:
     if not title:
         return ""
-    title = re.sub(r'<[^>]+>', '', title)
-    title = re.sub(r'\s+', ' ', title).strip()
+    title = re.sub(r"<[^>]+>", "", title)
+    title = re.sub(r"\s+", " ", title).strip()
     return title
 
 
@@ -122,11 +121,11 @@ def resumability_score(session: dict, cache: SessionCache) -> float:
 
     # The more "mid-stream" the last entry, the more unfinished
     unfinished_map = {
-        "user": 25,       # Typed something, never got response — maximum urgency
-        "progress": 22,   # Mid-tool-execution crash
-        "tool_result": 20, # Tool done but no response
+        "user": 25,  # Typed something, never got response — maximum urgency
+        "progress": 22,  # Mid-tool-execution crash
+        "tool_result": 20,  # Tool done but no response
         "assistant": 10,  # Normal conversation — could have been mid-thought
-        "summary": 5,     # Context compaction — long session, probably fine
+        "summary": 5,  # Context compaction — long session, probably fine
     }
     unfinished = unfinished_map.get(last_type, 8)
 
@@ -135,7 +134,9 @@ def resumability_score(session: dict, cache: SessionCache) -> float:
     if summary and isinstance(summary, dict):
         state = summary.get("state", "")
         # If state says "done", "completed", "finished" — lower unfinished score
-        if state and any(w in state.lower() for w in ("done", "completed", "finished", "wrapped up")):
+        if state and any(
+            w in state.lower() for w in ("done", "completed", "finished", "wrapped up")
+        ):
             unfinished = max(unfinished - 10, 0)
 
     # ── Signal 4: Classification (10 points max) ──
@@ -398,7 +399,6 @@ def _extract_window_context(filepath) -> dict[str, str]:
     return result
 
 
-
 def _window_summary_adapter(context: str, session_file: str | None = None) -> str:
     """Generate a window summary from context text.
 
@@ -414,6 +414,7 @@ def _window_summary_adapter(context: str, session_file: str | None = None) -> st
         try:
             from claude_session_commons.classify import get_label
             from pathlib import Path
+
             label = get_label(Path(session_file))
             origin = "human" if label == "interactive" else "agent"
         except Exception:
@@ -423,6 +424,7 @@ def _window_summary_adapter(context: str, session_file: str | None = None) -> st
 
     try:
         from claude_session_commons.summarizer import is_available, summarize
+
         if is_available():
             result = summarize(prefix + context)
             if result:
@@ -511,8 +513,9 @@ def _extract_last_messages(filepath, max_msgs: int = 8) -> list[str]:
 class NavItem(ListItem):
     """A numbered navigation item in the left pane."""
 
-    def __init__(self, number: int, label: str, sublabel: str = "",
-                 bar: str = "", **kwargs) -> None:
+    def __init__(
+        self, number: int, label: str, sublabel: str = "", bar: str = "", **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.number = number
         self.label_text = label
@@ -531,7 +534,9 @@ class NavItem(ListItem):
 class SearchResultItem(ListItem):
     """A search result in the left pane."""
 
-    def __init__(self, number: int, title: str, project: str, age: str, hits: int, **kwargs) -> None:
+    def __init__(
+        self, number: int, title: str, project: str, age: str, hits: int, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.number = number
         self.title_text = title
@@ -552,6 +557,7 @@ class SearchResultItem(ListItem):
 
 class SessionChosen(Message):
     """User wants to resume a session."""
+
     def __init__(self, session: dict) -> None:
         super().__init__()
         self.session = session
@@ -559,6 +565,7 @@ class SessionChosen(Message):
 
 class SearchDone(Message):
     """Background search completed."""
+
     def __init__(self, results: list[tuple[dict, int]]) -> None:
         super().__init__()
         self.results = results
@@ -566,6 +573,7 @@ class SearchDone(Message):
 
 class ScoresReady(Message):
     """Background score computation finished."""
+
     def __init__(self, scores: dict[str, float]) -> None:
         super().__init__()
         self.scores = scores
@@ -656,6 +664,7 @@ class ResumeV2App(App):
     def _classify_origin(self, s: dict) -> str:
         """Return 'human' or 'agent' for a session dict. Fast path only."""
         from pathlib import Path as _Path
+
         filepath = str(s.get("file", ""))
         # Check persistent cache field first
         sid = s.get("session_id", "")
@@ -676,9 +685,13 @@ class ResumeV2App(App):
         all_sessions = find_recent_sessions(self.hours, max_sessions=500)
         # Route by origin: resume = human-initiated, review = AI-spawned
         if self.view_mode == "resume":
-            self.sessions = [s for s in all_sessions if self._classify_origin(s) == "human"]
+            self.sessions = [
+                s for s in all_sessions if self._classify_origin(s) == "human"
+            ]
         else:
-            self.sessions = [s for s in all_sessions if self._classify_origin(s) == "agent"]
+            self.sessions = [
+                s for s in all_sessions if self._classify_origin(s) == "agent"
+            ]
         self.grouped = _group_sessions(self.sessions)
 
     def action_toggle_view(self) -> None:
@@ -686,9 +699,12 @@ class ResumeV2App(App):
         self.view_mode = "review" if self.view_mode == "resume" else "resume"
         self._load_sessions()
         self._show_groups()
-        mode_label = "[bold green]RESUME[/] (your sessions)" if self.view_mode == "resume" \
+        mode_label = (
+            "[bold green]RESUME[/] (your sessions)"
+            if self.view_mode == "resume"
             else "[bold yellow]REVIEW[/] (AI-spawned)"
-        self.sub_title = f"Mode: {mode_label.replace('[bold green]','').replace('[bold yellow]','').replace('[/]','')} — press T to toggle"
+        )
+        self.sub_title = f"Mode: {mode_label.replace('[bold green]', '').replace('[bold yellow]', '').replace('[/]', '')} — press T to toggle"
 
     @work(thread=True)
     def _precompute_scores_bg(self) -> None:
@@ -795,7 +811,9 @@ class ResumeV2App(App):
         if repo_idx < 0 or repo_idx >= len(self._current_repo_groups):
             return
         repo, repo_sessions = self._current_repo_groups[repo_idx]
-        repo_sessions_sorted = sorted(repo_sessions, key=lambda s: s["mtime"], reverse=True)
+        repo_sessions_sorted = sorted(
+            repo_sessions, key=lambda s: s["mtime"], reverse=True
+        )
 
         text = f"[bold underline]{esc(self._current_org)} / {esc(repo)}[/]  [dim]{len(repo_sessions)} sessions[/]\n\n"
 
@@ -895,7 +913,9 @@ class ResumeV2App(App):
             lv.index = 0
             self._update_preview_for_session(message.results[0][0])
         else:
-            self._update_preview_text(f"[dim]No sessions found matching the search term.[/]")
+            self._update_preview_text(
+                "[dim]No sessions found matching the search term.[/]"
+            )
 
         self._update_breadcrumb(
             f"Search: [bold yellow]{esc(self.search_term or '')}[/]  "
@@ -909,9 +929,13 @@ class ResumeV2App(App):
         if group_idx < 0 or group_idx >= len(self.grouped):
             return
         org, group_sessions = self.grouped[group_idx]
-        group_sessions_sorted = sorted(group_sessions, key=lambda s: s["mtime"], reverse=True)
+        group_sessions_sorted = sorted(
+            group_sessions, key=lambda s: s["mtime"], reverse=True
+        )
 
-        text = f"[bold underline]{esc(org)}[/]  [dim]{len(group_sessions)} sessions[/]\n\n"
+        text = (
+            f"[bold underline]{esc(org)}[/]  [dim]{len(group_sessions)} sessions[/]\n\n"
+        )
 
         for i, s in enumerate(group_sessions_sorted[:10], 1):
             title = _get_cached_title(self.cache, s)
@@ -934,7 +958,9 @@ class ResumeV2App(App):
 
         self._build_preview_bg(s)
 
-    def _build_preview_text(self, s: dict, window_sums: dict[str, str] | None = None) -> str:
+    def _build_preview_text(
+        self, s: dict, window_sums: dict[str, str] | None = None
+    ) -> str:
         """Build preview markup from cached data only — no I/O, no ML. Instant."""
         sid = s["session_id"]
         project = shorten_path(s["project_dir"])
@@ -956,7 +982,11 @@ class ResumeV2App(App):
         # Active time / focus (daemon-cached)
         ck_at = self.cache.cache_key(s["file"])
         active_time = self.cache.get(sid, ck_at, "active_time")
-        if active_time and isinstance(active_time, dict) and active_time.get("active_seconds"):
+        if (
+            active_time
+            and isinstance(active_time, dict)
+            and active_time.get("active_seconds")
+        ):
             active_s = active_time["active_seconds"]
             total_s = active_time["total_seconds"]
             focus = active_time.get("focus_pct", 0)
@@ -964,7 +994,9 @@ class ResumeV2App(App):
             total_h, total_m = divmod(total_s // 60, 60)
             active_str = f"{active_h}h{active_m:02d}m" if active_h else f"{active_m}m"
             total_str = f"{total_h}h{total_m:02d}m" if total_h else f"{total_m}m"
-            focus_color = "green" if focus >= 70 else ("yellow" if focus >= 40 else "red")
+            focus_color = (
+                "green" if focus >= 70 else ("yellow" if focus >= 40 else "red")
+            )
             text += f"[bold]Focus:[/]       [{focus_color}]{focus:.0f}%[/] active  ({active_str} of {total_str})\n"
 
         if summary:
@@ -991,7 +1023,9 @@ class ResumeV2App(App):
             if blockers:
                 text += "\n[bold red]Blockers:[/]\n"
                 for b in blockers:
-                    desc = b.get("description", str(b)) if isinstance(b, dict) else str(b)
+                    desc = (
+                        b.get("description", str(b)) if isinstance(b, dict) else str(b)
+                    )
                     text += f"  [red]•[/] {esc(desc)}\n"
             next_actions = bookmark.get("next_actions", [])
             if next_actions:
@@ -1001,7 +1035,11 @@ class ResumeV2App(App):
 
         deep = self.cache.get(sid, ck, "deep_summary")
         if deep and isinstance(deep, dict):
-            for field, label in [("objective", "Objective"), ("progress", "Progress"), ("next_steps", "Next steps")]:
+            for field, label in [
+                ("objective", "Objective"),
+                ("progress", "Progress"),
+                ("next_steps", "Next steps"),
+            ]:
                 val = deep.get(field, "")
                 if val:
                     text += f"\n[bold]{label}:[/]\n{esc(val)}\n"
@@ -1020,7 +1058,11 @@ class ResumeV2App(App):
             cached_wins = {}
         merged = {**cached_wins, **(window_sums or {})}
 
-        for label, key in [("Last 5 min", "5m"), ("Last 30 min", "30m"), ("Last 2 hours", "2h")]:
+        for label, key in [
+            ("Last 5 min", "5m"),
+            ("Last 30 min", "30m"),
+            ("Last 2 hours", "2h"),
+        ]:
             val = merged.get(key)
             if val:
                 text += f"  [bold]{label}:[/]  {esc(val)}\n"
@@ -1063,7 +1105,9 @@ class ResumeV2App(App):
             if cached_wins.get(key):
                 continue  # already cached, skip
 
-            _summarize_single_window(key, contexts.get(key, ""), sid, self.cache, s["file"])
+            _summarize_single_window(
+                key, contexts.get(key, ""), sid, self.cache, s["file"]
+            )
 
             # Re-read merged cache and re-render so user sees the update
             updated_wins = self.cache.get(sid, ck, "window_summaries") or {}
@@ -1119,7 +1163,7 @@ class ResumeV2App(App):
             return
 
         # Number keys for instant selection
-        if event.character and event.character.isdigit() and event.character != '0':
+        if event.character and event.character.isdigit() and event.character != "0":
             num = int(event.character) - 1
             self._select_item(num)
             event.prevent_default()
@@ -1161,12 +1205,16 @@ class ResumeV2App(App):
 
         # Page up/down for preview scrolling
         if event.key == "pagedown":
-            self.query_one("#preview-pane", VerticalScroll).scroll_page_down(animate=False)
+            self.query_one("#preview-pane", VerticalScroll).scroll_page_down(
+                animate=False
+            )
             event.prevent_default()
             event.stop()
             return
         if event.key == "pageup":
-            self.query_one("#preview-pane", VerticalScroll).scroll_page_up(animate=False)
+            self.query_one("#preview-pane", VerticalScroll).scroll_page_up(
+                animate=False
+            )
             event.prevent_default()
             event.stop()
             return
@@ -1195,13 +1243,15 @@ class ResumeV2App(App):
 
         project_dir = s["project_dir"]
         session_id = s["session_id"]
-        resume_cmd = f"claude --resume {shlex.quote(session_id)} --dangerously-skip-permissions"
+        resume_cmd = (
+            f"claude --resume {shlex.quote(session_id)} --dangerously-skip-permissions"
+        )
 
         try:
             subprocess.run(["code", project_dir], capture_output=True, timeout=5)
             _t.sleep(1.5)
 
-            applescript = f'''
+            applescript = f"""
                 tell application "Visual Studio Code"
                     activate
                 end tell
@@ -1215,11 +1265,15 @@ class ResumeV2App(App):
                         key code 36
                     end tell
                 end tell
-            '''
-            subprocess.run(["osascript", "-e", applescript], capture_output=True, timeout=10)
+            """
+            subprocess.run(
+                ["osascript", "-e", applescript], capture_output=True, timeout=10
+            )
 
             title = _get_cached_title(self.cache, s) or session_id[:8]
-            self.call_from_thread(self.notify, f"VS Code: {title}", title="Opened", severity="information")
+            self.call_from_thread(
+                self.notify, f"VS Code: {title}", title="Opened", severity="information"
+            )
         except Exception as e:
             self.call_from_thread(self.notify, f"VS Code failed: {e}", severity="error")
 
@@ -1233,7 +1287,7 @@ class ResumeV2App(App):
         session_id = s["session_id"]
         cmd = f"cd {shlex.quote(project_dir)} && claude --resume {shlex.quote(session_id)} --dangerously-skip-permissions"
 
-        applescript = f'''
+        applescript = f"""
             tell application "iTerm2"
                 activate
                 tell current window
@@ -1243,11 +1297,15 @@ class ResumeV2App(App):
                     end tell
                 end tell
             end tell
-        '''
+        """
         try:
-            subprocess.run(["osascript", "-e", applescript], capture_output=True, timeout=5)
+            subprocess.run(
+                ["osascript", "-e", applescript], capture_output=True, timeout=5
+            )
             title = _get_cached_title(self.cache, s) or session_id[:8]
-            self.call_from_thread(self.notify, f"iTerm2: {title}", title="Resumed", severity="information")
+            self.call_from_thread(
+                self.notify, f"iTerm2: {title}", title="Resumed", severity="information"
+            )
         except Exception as e:
             self.call_from_thread(self.notify, f"iTerm2 failed: {e}", severity="error")
 

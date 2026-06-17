@@ -12,19 +12,43 @@ import numpy as np
 
 # Palette
 C = {
-    "bg": "#12121a", "surface": "#1a1a28", "border": "#2a2a3a",
-    "text": "#e4e4ef", "text2": "#8888a0",
-    "indigo": "#6366f1", "indigo2": "#818cf8",
-    "green": "#22c55e", "amber": "#f59e0b", "rose": "#f43f5e",
-    "cyan": "#06b6d4", "purple": "#a855f7", "pink": "#ec4899",
-    "teal": "#14b8a6", "blue": "#3b82f6", "orange": "#f97316",
+    "bg": "#12121a",
+    "surface": "#1a1a28",
+    "border": "#2a2a3a",
+    "text": "#e4e4ef",
+    "text2": "#8888a0",
+    "indigo": "#6366f1",
+    "indigo2": "#818cf8",
+    "green": "#22c55e",
+    "amber": "#f59e0b",
+    "rose": "#f43f5e",
+    "cyan": "#06b6d4",
+    "purple": "#a855f7",
+    "pink": "#ec4899",
+    "teal": "#14b8a6",
+    "blue": "#3b82f6",
+    "orange": "#f97316",
 }
-PALETTE = [C["indigo"], C["cyan"], C["green"], C["amber"], C["rose"],
-           C["purple"], C["pink"], C["teal"], C["blue"], C["orange"]]
+PALETTE = [
+    C["indigo"],
+    C["cyan"],
+    C["green"],
+    C["amber"],
+    C["rose"],
+    C["purple"],
+    C["pink"],
+    C["teal"],
+    C["blue"],
+    C["orange"],
+]
 
 
 def _svg(w, h, content, title=""):
-    hdr = f'<text x="{w/2}" y="22" text-anchor="middle" fill="{C["text2"]}" font-size="11" font-weight="600" text-transform="uppercase" letter-spacing="0.05em">{title}</text>' if title else ""
+    hdr = (
+        f'<text x="{w / 2}" y="22" text-anchor="middle" fill="{C["text2"]}" font-size="11" font-weight="600" text-transform="uppercase" letter-spacing="0.05em">{title}</text>'
+        if title
+        else ""
+    )
     return f'<svg width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg"><rect width="{w}" height="{h}" rx="12" fill="{C["bg"]}"/>{hdr}{content}</svg>'
 
 
@@ -44,17 +68,17 @@ def cumulative_sessions(sessions, width=600, height=250):
         cumulative.append(total)
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 10
+    pw, ph = width - 2 * m, height - 2 * m - 10
     mx = max(cumulative)
     n = len(cumulative)
 
     points = []
     for i, v in enumerate(cumulative):
-        x = m + i / max(n-1, 1) * pw
+        x = m + i / max(n - 1, 1) * pw
         y = m + 10 + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+10+ph} " + " ".join(points) + f" {m + pw},{m+10+ph}"
+    fill_pts = f"{m},{m + 10 + ph} " + " ".join(points) + f" {m + pw},{m + 10 + ph}"
     line = f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["indigo"]}" stroke-width="2.5" stroke-linejoin="round"/>'
     fill = f'<polygon points="{fill_pts}" fill="url(#cg)" opacity="0.3"/>'
     grad = f'<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["indigo"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
@@ -63,12 +87,19 @@ def cumulative_sessions(sessions, width=600, height=250):
     labels = ""
     step = max(n // 6, 1)
     for i in range(0, n, step):
-        x = m + i / max(n-1,1) * pw
-        labels += f'<text x="{x:.0f}" y="{m+10+ph+16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{all_dates[i][5:]}</text>'
+        x = m + i / max(n - 1, 1) * pw
+        labels += f'<text x="{x:.0f}" y="{m + 10 + ph + 16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{all_dates[i][5:]}</text>'
 
-    return _svg(width, height, grad + fill + line + labels +
-        f'<text x="{m+pw}" y="{m+5}" text-anchor="end" fill="{C["text"]}" font-size="12" font-weight="700">{mx:,}</text>',
-        "Cumulative Sessions")
+    return _svg(
+        width,
+        height,
+        grad
+        + fill
+        + line
+        + labels
+        + f'<text x="{m + pw}" y="{m + 5}" text-anchor="end" fill="{C["text"]}" font-size="12" font-weight="700">{mx:,}</text>',
+        "Cumulative Sessions",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -84,22 +115,25 @@ def tokens_per_day(sessions, width=600, height=250):
     values = [by_date[d] for d in dates]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 10
+    pw, ph = width - 2 * m, height - 2 * m - 10
     mx = max(values) or 1
     n = len(values)
 
     points = []
     for i, v in enumerate(values):
-        x = m + i / max(n-1,1) * pw
+        x = m + i / max(n - 1, 1) * pw
         y = m + 10 + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+10+ph} " + " ".join(points) + f" {m+pw},{m+10+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + 10 + ph} " + " ".join(points) + f" {m + pw},{m + 10 + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["cyan"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#tg)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["cyan"]}" stroke-width="2" stroke-linejoin="round"/>',
-        "Tokens per Day")
+        "Tokens per Day",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -123,14 +157,14 @@ def hour_day_heatmap(sessions, width=600, height=250):
             alpha = 0.05 + 0.95 * (v / mx)
             x = m_left + h * cw
             y = m_top + d * ch
-            cells += f'<rect x="{x:.1f}" y="{y:.1f}" width="{cw-1:.1f}" height="{ch-1:.1f}" rx="3" fill="rgba(99,102,241,{alpha:.2f})"/>'
+            cells += f'<rect x="{x:.1f}" y="{y:.1f}" width="{cw - 1:.1f}" height="{ch - 1:.1f}" rx="3" fill="rgba(99,102,241,{alpha:.2f})"/>'
 
     # Labels
     labels = ""
     for d, name in enumerate(days):
-        labels += f'<text x="{m_left-6}" y="{m_top + d*ch + ch/2 + 4}" text-anchor="end" fill="{C["text2"]}" font-size="10">{name}</text>'
+        labels += f'<text x="{m_left - 6}" y="{m_top + d * ch + ch / 2 + 4}" text-anchor="end" fill="{C["text2"]}" font-size="10">{name}</text>'
     for h in range(0, 24, 3):
-        labels += f'<text x="{m_left + h*cw + cw/2}" y="{m_top - 6}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
+        labels += f'<text x="{m_left + h * cw + cw / 2}" y="{m_top - 6}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
 
     return _svg(width, height, cells + labels, "Hour × Day Heatmap")
 
@@ -171,12 +205,22 @@ def project_timeline(sessions, width=700, height=350):
     bars = ""
     for i, (name, info) in enumerate(top):
         y = m_top + i * row_h
-        x1 = m_left + (datetime.strptime(info["first"], "%Y-%m-%d") - date_min).days / date_range * pw
-        x2 = m_left + (datetime.strptime(info["last"], "%Y-%m-%d") - date_min).days / date_range * pw
+        x1 = (
+            m_left
+            + (datetime.strptime(info["first"], "%Y-%m-%d") - date_min).days
+            / date_range
+            * pw
+        )
+        x2 = (
+            m_left
+            + (datetime.strptime(info["last"], "%Y-%m-%d") - date_min).days
+            / date_range
+            * pw
+        )
         w = max(x2 - x1, 4)
         color = PALETTE[i % len(PALETTE)]
-        bars += f'<rect x="{x1:.0f}" y="{y+2:.0f}" width="{w:.0f}" height="{row_h-4:.0f}" rx="4" fill="{color}" opacity="0.7"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
+        bars += f'<rect x="{x1:.0f}" y="{y + 2:.0f}" width="{w:.0f}" height="{row_h - 4:.0f}" rx="4" fill="{color}" opacity="0.7"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
 
     return _svg(width, height, bars, "Project Timeline")
 
@@ -191,17 +235,26 @@ def rolling_sessions(sessions, window=7, width=600, height=200):
         return ""
 
     values = [by_date[d] for d in dates]
-    rolling = [sum(values[max(0,i-window+1):i+1])/min(i+1,window) for i in range(len(values))]
+    rolling = [
+        sum(values[max(0, i - window + 1) : i + 1]) / min(i + 1, window)
+        for i in range(len(values))
+    ]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(rolling) or 1
 
-    points = " ".join(f"{m + i/max(len(rolling)-1,1)*pw:.1f},{m + ph - v/mx*ph:.1f}" for i, v in enumerate(rolling))
-    return _svg(width, height,
+    points = " ".join(
+        f"{m + i / max(len(rolling) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(rolling)
+    )
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["green"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{rolling[-1]:.0f}/day avg</text>',
-        f"Rolling {window}-Day Average Sessions")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{rolling[-1]:.0f}/day avg</text>',
+        f"Rolling {window}-Day Average Sessions",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -239,11 +292,11 @@ def duration_by_project(sessions, width=600, height=350):
         xm = m_left + median / mx * pw
 
         # IQR bar
-        bars += f'<rect x="{x1:.0f}" y="{y+row_h*0.2:.0f}" width="{max(x2-x1,2):.0f}" height="{row_h*0.6:.0f}" rx="3" fill="{color}" opacity="0.6"/>'
+        bars += f'<rect x="{x1:.0f}" y="{y + row_h * 0.2:.0f}" width="{max(x2 - x1, 2):.0f}" height="{row_h * 0.6:.0f}" rx="3" fill="{color}" opacity="0.6"/>'
         # Median line
-        bars += f'<line x1="{xm:.0f}" y1="{y+row_h*0.1:.0f}" x2="{xm:.0f}" y2="{y+row_h*0.9:.0f}" stroke="{C["text"]}" stroke-width="2"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
-        bars += f'<text x="{x2+6:.0f}" y="{y+row_h/2+4:.0f}" fill="{C["text2"]}" font-size="8">{np.median(arr):.0f}m</text>'
+        bars += f'<line x1="{xm:.0f}" y1="{y + row_h * 0.1:.0f}" x2="{xm:.0f}" y2="{y + row_h * 0.9:.0f}" stroke="{C["text"]}" stroke-width="2"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
+        bars += f'<text x="{x2 + 6:.0f}" y="{y + row_h / 2 + 4:.0f}" fill="{C["text2"]}" font-size="8">{np.median(arr):.0f}m</text>'
 
     return _svg(width, height, bars, "Session Duration by Project (IQR)")
 
@@ -256,21 +309,24 @@ def message_donut(sessions, width=250, height=250):
     asst = sum(s.get("assistant_msgs", 0) for s in sessions)
     total = user + asst or 1
 
-    cx, cy, r = width/2, height/2 + 5, 80
+    cx, cy, r = width / 2, height / 2 + 5, 80
     circumference = 2 * math.pi * r
     user_arc = user / total * circumference
     asst_arc = asst / total * circumference
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{C["cyan"]}" stroke-width="20" '
         f'stroke-dasharray="{user_arc:.1f} {circumference:.1f}" transform="rotate(-90 {cx} {cy})"/>'
         f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{C["indigo"]}" stroke-width="20" '
         f'stroke-dasharray="{asst_arc:.1f} {circumference:.1f}" stroke-dashoffset="-{user_arc:.1f}" transform="rotate(-90 {cx} {cy})"/>'
-        f'<text x="{cx}" y="{cy-6}" text-anchor="middle" fill="{C["text"]}" font-size="18" font-weight="800">{total:,}</text>'
-        f'<text x="{cx}" y="{cy+12}" text-anchor="middle" fill="{C["text2"]}" font-size="10">messages</text>'
-        f'<circle cx="{cx-50}" cy="{cy+r+20}" r="5" fill="{C["cyan"]}"/><text x="{cx-40}" y="{cy+r+24}" fill="{C["text2"]}" font-size="10">You {user/total*100:.0f}%</text>'
-        f'<circle cx="{cx+20}" cy="{cy+r+20}" r="5" fill="{C["indigo"]}"/><text x="{cx+30}" y="{cy+r+24}" fill="{C["text2"]}" font-size="10">Claude {asst/total*100:.0f}%</text>',
-        "Message Ratio")
+        f'<text x="{cx}" y="{cy - 6}" text-anchor="middle" fill="{C["text"]}" font-size="18" font-weight="800">{total:,}</text>'
+        f'<text x="{cx}" y="{cy + 12}" text-anchor="middle" fill="{C["text2"]}" font-size="10">messages</text>'
+        f'<circle cx="{cx - 50}" cy="{cy + r + 20}" r="5" fill="{C["cyan"]}"/><text x="{cx - 40}" y="{cy + r + 24}" fill="{C["text2"]}" font-size="10">You {user / total * 100:.0f}%</text>'
+        f'<circle cx="{cx + 20}" cy="{cy + r + 20}" r="5" fill="{C["indigo"]}"/><text x="{cx + 30}" y="{cy + r + 24}" fill="{C["text2"]}" font-size="10">Claude {asst / total * 100:.0f}%</text>',
+        "Message Ratio",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -295,8 +351,8 @@ def monthly_bars(sessions, width=500, height=220):
         x = m_left + i * (bar_w + 4)
         y = m_top + ph - h
         bars += f'<rect x="{x:.0f}" y="{y:.0f}" width="{bar_w:.0f}" height="{h:.0f}" rx="4" fill="{C["purple"]}" opacity="0.7"/>'
-        bars += f'<text x="{x+bar_w/2:.0f}" y="{m_top+ph+14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{month[5:]}</text>'
-        bars += f'<text x="{x+bar_w/2:.0f}" y="{y-4}" text-anchor="middle" fill="{C["text"]}" font-size="10" font-weight="700">{v}</text>'
+        bars += f'<text x="{x + bar_w / 2:.0f}" y="{m_top + ph + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{month[5:]}</text>'
+        bars += f'<text x="{x + bar_w / 2:.0f}" y="{y - 4}" text-anchor="middle" fill="{C["text"]}" font-size="10" font-weight="700">{v}</text>'
 
     return _svg(width, height, bars, "Sessions by Month")
 
@@ -330,9 +386,9 @@ def mcp_tools_chart(sessions, width=500, height=280):
         y = m_top + i * row_h
         w = count / mx * pw
         color = PALETTE[i % len(PALETTE)]
-        bars += f'<rect x="{m_left}" y="{y+2:.0f}" width="{w:.0f}" height="{row_h-4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:15]}</text>'
-        bars += f'<text x="{m_left+w+6:.0f}" y="{y+row_h/2+4:.0f}" fill="{C["text2"]}" font-size="9">{count:,}</text>'
+        bars += f'<rect x="{m_left}" y="{y + 2:.0f}" width="{w:.0f}" height="{row_h - 4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:15]}</text>'
+        bars += f'<text x="{m_left + w + 6:.0f}" y="{y + row_h / 2 + 4:.0f}" fill="{C["text2"]}" font-size="9">{count:,}</text>'
 
     return _svg(width, height, bars, "MCP Server Usage")
 
@@ -348,7 +404,7 @@ def size_distribution(sessions, width=500, height=200):
     hist, edges = np.histogram(log_sizes, bins=30)
     mx = max(hist) or 1
     m = 40
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     bar_w = pw / 30 - 1
 
     bars = ""
@@ -370,7 +426,15 @@ def productivity_by_day(sessions, width=500, height=220):
         if s.get("total_tokens", 0) > 0:
             day_tokens[s.get("weekday", "?")].append(s["total_tokens"])
 
-    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    days = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
     avgs = [np.mean(day_tokens.get(d, [0])) for d in days]
     mx = max(avgs) or 1
 
@@ -385,7 +449,7 @@ def productivity_by_day(sessions, width=500, height=220):
         x = m_left + i * (bar_w + 6)
         y = m_top + ph - h
         bars += f'<rect x="{x:.0f}" y="{y:.0f}" width="{bar_w:.0f}" height="{h:.0f}" rx="4" fill="{C["amber"]}" opacity="0.7"/>'
-        bars += f'<text x="{x+bar_w/2:.0f}" y="{m_top+ph+14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{day[:3]}</text>'
+        bars += f'<text x="{x + bar_w / 2:.0f}" y="{m_top + ph + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{day[:3]}</text>'
 
     return _svg(width, height, bars, "Avg Tokens per Session by Day")
 
@@ -399,28 +463,43 @@ def start_time_density(sessions, width=500, height=180):
     mx = max(hist) or 1
 
     m = 40
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     points = []
     for i, c in enumerate(hist):
-        x = m + (edges[i] + edges[i+1]) / 2 / 24 * pw
+        x = m + (edges[i] + edges[i + 1]) / 2 / 24 * pw
         y = m + ph - c / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    labels = "".join(f'<text x="{m + h/24*pw:.0f}" y="{m+ph+14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>' for h in range(0, 24, 4))
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    labels = "".join(
+        f'<text x="{m + h / 24 * pw:.0f}" y="{m + ph + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
+        for h in range(0, 24, 4)
+    )
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="sd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["pink"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#sd)" opacity="0.4"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["pink"]}" stroke-width="2" stroke-linejoin="round"/>'
-        + labels, "Session Start Time Density")
+        + labels,
+        "Session Start Time Density",
+    )
 
 
 # -----------------------------------------------------------------------
 # 13. Tool category pie
 # -----------------------------------------------------------------------
 def tool_category_donut(sessions, width=280, height=280):
-    cats = {"Read": 0, "Write": 0, "Execute": 0, "Search": 0, "Agent": 0, "MCP": 0, "Other": 0}
+    cats = {
+        "Read": 0,
+        "Write": 0,
+        "Execute": 0,
+        "Search": 0,
+        "Agent": 0,
+        "MCP": 0,
+        "Other": 0,
+    }
     read_tools = {"Read", "Glob", "Grep", "LS"}
     write_tools = {"Edit", "Write", "NotebookEdit"}
     exec_tools = {"Bash", "BashOutput"}
@@ -431,17 +510,32 @@ def tool_category_donut(sessions, width=280, height=280):
         if not isinstance(tools, dict):
             continue
         for name, count in tools.items():
-            if name in read_tools: cats["Read"] += count
-            elif name in write_tools: cats["Write"] += count
-            elif name in exec_tools: cats["Execute"] += count
-            elif name in search_tools: cats["Search"] += count
-            elif name == "Agent": cats["Agent"] += count
-            elif name.startswith("mcp__"): cats["MCP"] += count
-            else: cats["Other"] += count
+            if name in read_tools:
+                cats["Read"] += count
+            elif name in write_tools:
+                cats["Write"] += count
+            elif name in exec_tools:
+                cats["Execute"] += count
+            elif name in search_tools:
+                cats["Search"] += count
+            elif name == "Agent":
+                cats["Agent"] += count
+            elif name.startswith("mcp__"):
+                cats["MCP"] += count
+            else:
+                cats["Other"] += count
 
     total = sum(cats.values()) or 1
-    cx, cy, r = width/2, height/2 + 5, 85
-    colors = [C["cyan"], C["indigo"], C["green"], C["amber"], C["purple"], C["pink"], C["teal"]]
+    cx, cy, r = width / 2, height / 2 + 5, 85
+    colors = [
+        C["cyan"],
+        C["indigo"],
+        C["green"],
+        C["amber"],
+        C["purple"],
+        C["pink"],
+        C["teal"],
+    ]
 
     arcs = ""
     offset = 0
@@ -455,9 +549,13 @@ def tool_category_donut(sessions, width=280, height=280):
         arcs += f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{colors[i]}" stroke-width="22" stroke-dasharray="{arc:.1f} {circumference:.1f}" stroke-dashoffset="-{offset:.1f}" transform="rotate(-90 {cx} {cy})"/>'
         offset += arc
 
-    return _svg(width, height, arcs +
-        f'<text x="{cx}" y="{cy}" text-anchor="middle" fill="{C["text"]}" font-size="13" font-weight="700">Tool Mix</text>',
-        "")
+    return _svg(
+        width,
+        height,
+        arcs
+        + f'<text x="{cx}" y="{cy}" text-anchor="middle" fill="{C["text"]}" font-size="13" font-weight="700">Tool Mix</text>',
+        "",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -466,12 +564,12 @@ def tool_category_donut(sessions, width=280, height=280):
 def hourly_radar(sessions, width=300, height=300):
     hour_counts = Counter(s.get("hour", 0) for s in sessions)
     mx = max(hour_counts.values()) if hour_counts else 1
-    cx, cy, r = width/2, height/2 + 10, 110
+    cx, cy, r = width / 2, height / 2 + 10, 110
 
     # Grid circles
     grid = ""
     for frac in [0.25, 0.5, 0.75, 1.0]:
-        grid += f'<circle cx="{cx}" cy="{cy}" r="{r*frac}" fill="none" stroke="{C["border"]}" stroke-width="1"/>'
+        grid += f'<circle cx="{cx}" cy="{cy}" r="{r * frac}" fill="none" stroke="{C["border"]}" stroke-width="1"/>'
 
     # Data polygon
     points = []
@@ -490,10 +588,14 @@ def hourly_radar(sessions, width=300, height=300):
         ly_pos = cy + (r + 16) * math.sin(angle)
         labels += f'<text x="{lx:.0f}" y="{ly_pos + 4:.0f}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
 
-    return _svg(width, height,
-        grid +
-        f'<polygon points="{" ".join(points)}" fill="{C["indigo"]}" opacity="0.2" stroke="{C["indigo"]}" stroke-width="2"/>'
-        + labels, "")
+    return _svg(
+        width,
+        height,
+        grid
+        + f'<polygon points="{" ".join(points)}" fill="{C["indigo"]}" opacity="0.2" stroke="{C["indigo"]}" stroke-width="2"/>'
+        + labels,
+        "",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -511,18 +613,24 @@ def token_efficiency(sessions, width=600, height=200):
         return ""
     ratios = [by_date[d][0] / max(by_date[d][1], 1) for d in dates]
     # 3-day rolling
-    smoothed = [np.mean(ratios[max(0,i-2):i+1]) for i in range(len(ratios))]
+    smoothed = [np.mean(ratios[max(0, i - 2) : i + 1]) for i in range(len(ratios))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) or 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["orange"]}" stroke-width="2" stroke-linejoin="round"/>'
-        f'<line x1="{m}" y1="{m+ph/2}" x2="{m+pw}" y2="{m+ph/2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>',
-        "Output/Input Token Ratio (3-day rolling)")
+        f'<line x1="{m}" y1="{m + ph / 2}" x2="{m + pw}" y2="{m + ph / 2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>',
+        "Output/Input Token Ratio (3-day rolling)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -540,19 +648,25 @@ def subagent_trend(sessions, width=600, height=200):
     if not dates:
         return ""
     rates = [by_date[d][1] / max(by_date[d][0], 1) * 100 for d in dates]
-    smoothed = [np.mean(rates[max(0,i-2):i+1]) for i in range(len(rates))]
+    smoothed = [np.mean(rates[max(0, i - 2) : i + 1]) for i in range(len(rates))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
     if mx == 0:
         mx = 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["purple"]}" stroke-width="2.5" stroke-linejoin="round"/>',
-        "Multi-Agent Session Rate (% of daily sessions)")
+        "Multi-Agent Session Rate (% of daily sessions)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -566,12 +680,12 @@ def daily_scatter(sessions, width=600, height=200):
     values = [by_date[d] for d in dates]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(values) or 1
 
     dots = ""
     for i, v in enumerate(values):
-        x = m + i / max(len(values)-1, 1) * pw
+        x = m + i / max(len(values) - 1, 1) * pw
         y = m + ph - v / mx * ph
         r = min(2 + v / mx * 4, 8)
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}" fill="{C["rose"]}" opacity="0.6"/>'
@@ -588,7 +702,7 @@ def flow_by_hour_chart(flow_data, width=500, height=200):
         return ""
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(rates.values()) or 1
     bar_w = pw / 24 - 2
 
@@ -601,7 +715,10 @@ def flow_by_hour_chart(flow_data, width=500, height=200):
         color = C["green"] if rate > 10 else C["indigo"]
         bars += f'<rect x="{x:.0f}" y="{y:.0f}" width="{bar_w:.0f}" height="{bh:.0f}" rx="2" fill="{color}" opacity="0.7"/>'
 
-    labels = "".join(f'<text x="{m + h*(bar_w+2) + bar_w/2:.0f}" y="{m+ph+13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>' for h in range(0, 24, 3))
+    labels = "".join(
+        f'<text x="{m + h * (bar_w + 2) + bar_w / 2:.0f}" y="{m + ph + 13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>'
+        for h in range(0, 24, 3)
+    )
     return _svg(width, height, bars + labels, "Flow State Rate by Hour (%)")
 
 
@@ -617,21 +734,27 @@ def burnout_trend(burnout_data, width=600, height=200):
         return ""
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     def line(values, color, label_text):
         mx = max(values) if values else 1
         if mx == 0:
             mx = 1
-        pts = " ".join(f"{m+i/max(len(values)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(values))
+        pts = " ".join(
+            f"{m + i / max(len(values) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+            for i, v in enumerate(values)
+        )
         return f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"/>'
 
-    return _svg(width, height,
-        line(hours, C["amber"], "Hours") +
-        line(late, C["rose"], "Late nights") +
-        f'<circle cx="{m+pw-60}" cy="18" r="4" fill="{C["amber"]}"/><text x="{m+pw-52}" y="22" fill="{C["text2"]}" font-size="9">Hours/wk</text>'
-        f'<circle cx="{m+pw}" cy="18" r="4" fill="{C["rose"]}"/><text x="{m+pw+8}" y="22" fill="{C["text2"]}" font-size="9">Late nights</text>',
-        "Weekly Burnout Signals")
+    return _svg(
+        width,
+        height,
+        line(hours, C["amber"], "Hours")
+        + line(late, C["rose"], "Late nights")
+        + f'<circle cx="{m + pw - 60}" cy="18" r="4" fill="{C["amber"]}"/><text x="{m + pw - 52}" y="22" fill="{C["text2"]}" font-size="9">Hours/wk</text>'
+        f'<circle cx="{m + pw}" cy="18" r="4" fill="{C["rose"]}"/><text x="{m + pw + 8}" y="22" fill="{C["text2"]}" font-size="9">Late nights</text>',
+        "Weekly Burnout Signals",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -672,7 +795,7 @@ def cooccurrence_graph(cooccurrence_data, width=500, height=400):
     for node in node_list:
         x, y = pos[node]
         node_elems += f'<circle cx="{x:.0f}" cy="{y:.0f}" r="18" fill="{C["surface"]}" stroke="{C["cyan"]}" stroke-width="1.5"/>'
-        node_elems += f'<text x="{x:.0f}" y="{y+3:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="7" font-weight="600">{node[:10]}</text>'
+        node_elems += f'<text x="{x:.0f}" y="{y + 3:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="7" font-weight="600">{node[:10]}</text>'
 
     return _svg(width, height, lines + node_elems, "Project Co-occurrence Network")
 
@@ -711,7 +834,7 @@ def contribution_calendar(sessions, width=700, height=160):
     day_labels = ""
     for i, name in enumerate(["M", "", "W", "", "F", "", "S"]):
         if name:
-            day_labels += f'<text x="{m_left-8}" y="{m_top + i*(cell+gap) + cell - 1}" text-anchor="end" fill="{C["text2"]}" font-size="8">{name}</text>'
+            day_labels += f'<text x="{m_left - 8}" y="{m_top + i * (cell + gap) + cell - 1}" text-anchor="end" fill="{C["text2"]}" font-size="8">{name}</text>'
 
     return _svg(width, height, cells + day_labels, "Activity Calendar")
 
@@ -730,17 +853,23 @@ def duration_trend(sessions, width=600, height=200):
         return ""
     avgs = [np.mean(by_date[d]) for d in dates]
     # 5-day rolling
-    smoothed = [np.mean(avgs[max(0,i-4):i+1]) for i in range(len(avgs))]
+    smoothed = [np.mean(avgs[max(0, i - 4) : i + 1]) for i in range(len(avgs))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) or 1
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["amber"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{smoothed[-1]:.0f}min avg</text>',
-        "Avg Session Duration Trend (5-day rolling)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{smoothed[-1]:.0f}min avg</text>',
+        "Avg Session Duration Trend (5-day rolling)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -749,7 +878,7 @@ def duration_trend(sessions, width=600, height=200):
 def velocity_scatter(sessions, width=600, height=220):
     dots = ""
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     pts = []
     for s in sessions:
@@ -771,10 +900,14 @@ def velocity_scatter(sessions, width=600, height=220):
         y = m + ph - min(vel / mx_y, 1) * ph
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{C["cyan"]}" opacity="0.4"/>'
 
-    return _svg(width, height, dots +
-        f'<text x="{m+pw/2}" y="{m+ph+16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Duration (min)</text>'
-        f'<text x="{m-8}" y="{m+ph/2}" text-anchor="middle" fill="{C["text2"]}" font-size="9" transform="rotate(-90 {m-8} {m+ph/2})">msgs/min</text>',
-        "Session Velocity (Messages per Minute)")
+    return _svg(
+        width,
+        height,
+        dots
+        + f'<text x="{m + pw / 2}" y="{m + ph + 16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Duration (min)</text>'
+        f'<text x="{m - 8}" y="{m + ph / 2}" text-anchor="middle" fill="{C["text2"]}" font-size="9" transform="rotate(-90 {m - 8} {m + ph / 2})">msgs/min</text>',
+        "Session Velocity (Messages per Minute)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -798,21 +931,24 @@ def cost_trend(sessions, width=600, height=200):
         cumulative.append(total)
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(cumulative) or 1
     points = []
     for i, v in enumerate(cumulative):
-        x = m + i / max(len(cumulative)-1, 1) * pw
+        x = m + i / max(len(cumulative) - 1, 1) * pw
         y = m + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="cst" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["rose"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#cst)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["rose"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m}" text-anchor="end" fill="{C["text"]}" font-size="12" font-weight="800">${total:,.0f}</text>',
-        "Estimated Cumulative Cost")
+        f'<text x="{m + pw}" y="{m}" text-anchor="end" fill="{C["text"]}" font-size="12" font-weight="800">${total:,.0f}</text>',
+        "Estimated Cumulative Cost",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -840,22 +976,28 @@ def weekend_vs_weekday(sessions, width=400, height=220):
     mx = max(wd_daily, we_daily)
 
     m = 50
-    pw = width - 2*m
+    pw = width - 2 * m
     ph = 100
     bw = 80
 
     bars = ""
-    for i, (label, val, color) in enumerate([("Weekday", wd_daily, C["indigo"]), ("Weekend", we_daily, C["amber"])]):
+    for i, (label, val, color) in enumerate(
+        [("Weekday", wd_daily, C["indigo"]), ("Weekend", we_daily, C["amber"])]
+    ):
         x = m + i * (bw + 40)
         h = val / mx * ph
         y = m + 30 + ph - h
         bars += f'<rect x="{x}" y="{y}" width="{bw}" height="{h}" rx="6" fill="{color}" opacity="0.7"/>'
-        bars += f'<text x="{x+bw/2}" y="{y-8}" text-anchor="middle" fill="{C["text"]}" font-size="14" font-weight="800">{val:.0f}</text>'
-        bars += f'<text x="{x+bw/2}" y="{m+30+ph+18}" text-anchor="middle" fill="{C["text2"]}" font-size="11">{label}</text>'
+        bars += f'<text x="{x + bw / 2}" y="{y - 8}" text-anchor="middle" fill="{C["text"]}" font-size="14" font-weight="800">{val:.0f}</text>'
+        bars += f'<text x="{x + bw / 2}" y="{m + 30 + ph + 18}" text-anchor="middle" fill="{C["text2"]}" font-size="11">{label}</text>'
 
-    return _svg(width, height, bars +
-        f'<text x="{width/2}" y="{m+30+ph+36}" text-anchor="middle" fill="{C["text2"]}" font-size="9">sessions/day average</text>',
-        "Weekend vs Weekday Intensity")
+    return _svg(
+        width,
+        height,
+        bars
+        + f'<text x="{width / 2}" y="{m + 30 + ph + 36}" text-anchor="middle" fill="{C["text2"]}" font-size="9">sessions/day average</text>',
+        "Weekend vs Weekday Intensity",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -869,25 +1011,28 @@ def project_diversity(sessions, width=600, height=200):
     if len(dates) < 3:
         return ""
     values = [len(by_date[d]) for d in dates]
-    smoothed = [np.mean(values[max(0,i-2):i+1]) for i in range(len(values))]
+    smoothed = [np.mean(values[max(0, i - 2) : i + 1]) for i in range(len(values))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) or 1
 
     points = []
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1,1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         y = m + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="pdiv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["teal"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#pdiv)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["teal"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{values[-1]} projects today</text>',
-        "Project Diversity (unique repos/day)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{values[-1]} projects today</text>',
+        "Project Diversity (unique repos/day)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -905,19 +1050,25 @@ def cache_efficiency(sessions, width=600, height=200):
     if not dates:
         return ""
     ratios = [by_date[d][0] / max(by_date[d][1], 1) * 100 for d in dates]
-    smoothed = [np.mean(ratios[max(0,i-2):i+1]) for i in range(len(ratios))]
+    smoothed = [np.mean(ratios[max(0, i - 2) : i + 1]) for i in range(len(ratios))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
     if mx == 0:
         mx = 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
-    return _svg(width, height,
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["green"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{smoothed[-1]:.0f}% cache hit</text>',
-        "Cache Efficiency (% input from cache)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="11" font-weight="700">{smoothed[-1]:.0f}% cache hit</text>',
+        "Cache Efficiency (% input from cache)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -932,7 +1083,7 @@ def conversation_depth(sessions, width=500, height=200):
     mx = max(hist) or 1
 
     m = 40
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     bar_w = pw / 30 - 1
 
     bars = ""
@@ -956,9 +1107,12 @@ def model_usage_donut(sessions, width=280, height=280):
             for m, c in models.items():
                 # Shorten model names
                 short = m.split("-")[0] if m else "unknown"
-                if "opus" in m.lower(): short = "Opus"
-                elif "sonnet" in m.lower(): short = "Sonnet"
-                elif "haiku" in m.lower(): short = "Haiku"
+                if "opus" in m.lower():
+                    short = "Opus"
+                elif "sonnet" in m.lower():
+                    short = "Sonnet"
+                elif "haiku" in m.lower():
+                    short = "Haiku"
                 model_counts[short] += c
 
     top = model_counts.most_common(6)
@@ -966,7 +1120,7 @@ def model_usage_donut(sessions, width=280, height=280):
         return ""
     total = sum(c for _, c in top)
 
-    cx, cy, r = width/2, height/2 + 5, 85
+    cx, cy, r = width / 2, height / 2 + 5, 85
     circumference = 2 * math.pi * r
     arcs = ""
     offset = 0
@@ -979,12 +1133,17 @@ def model_usage_donut(sessions, width=280, height=280):
     for i, (name, count) in enumerate(top):
         ly = cy + r + 15 + i * 14
         pct = count / total * 100
-        legend += f'<circle cx="{cx-60}" cy="{ly}" r="4" fill="{PALETTE[i % len(PALETTE)]}"/>'
-        legend += f'<text x="{cx-50}" y="{ly+4}" fill="{C["text2"]}" font-size="9">{name} ({pct:.0f}%)</text>'
+        legend += f'<circle cx="{cx - 60}" cy="{ly}" r="4" fill="{PALETTE[i % len(PALETTE)]}"/>'
+        legend += f'<text x="{cx - 50}" y="{ly + 4}" fill="{C["text2"]}" font-size="9">{name} ({pct:.0f}%)</text>'
 
-    return _svg(width, max(height, height + len(top) * 14), arcs +
-        f'<text x="{cx}" y="{cy}" text-anchor="middle" fill="{C["text"]}" font-size="13" font-weight="700">Models</text>' + legend,
-        "")
+    return _svg(
+        width,
+        max(height, height + len(top) * 14),
+        arcs
+        + f'<text x="{cx}" y="{cy}" text-anchor="middle" fill="{C["text"]}" font-size="13" font-weight="700">Models</text>'
+        + legend,
+        "",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -994,7 +1153,7 @@ def session_gaps(sessions, width=500, height=200):
     mtimes = sorted(s.get("mtime", 0) for s in sessions)
     if len(mtimes) < 10:
         return ""
-    gaps = [(mtimes[i+1] - mtimes[i]) / 60 for i in range(len(mtimes)-1)]  # minutes
+    gaps = [(mtimes[i + 1] - mtimes[i]) / 60 for i in range(len(mtimes) - 1)]  # minutes
     gaps = [g for g in gaps if 0 < g < 1440]  # filter > 0 and < 24h
     if not gaps:
         return ""
@@ -1004,7 +1163,7 @@ def session_gaps(sessions, width=500, height=200):
     mx = max(hist) or 1
 
     m = 40
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     bar_w = pw / 30 - 1
 
     bars = ""
@@ -1015,9 +1174,13 @@ def session_gaps(sessions, width=500, height=200):
         bars += f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" rx="1" fill="{C["orange"]}" opacity="0.7"/>'
 
     median_gap = np.median(gaps)
-    return _svg(width, height, bars +
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">median: {median_gap:.0f}min</text>',
-        "Time Between Sessions (log minutes)")
+    return _svg(
+        width,
+        height,
+        bars
+        + f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">median: {median_gap:.0f}min</text>',
+        "Time Between Sessions (log minutes)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1033,17 +1196,24 @@ def night_owl_trend(sessions, width=600, height=200):
     if len(dates) < 3:
         return ""
     rates = [by_date[d][1] / max(by_date[d][0], 1) * 100 for d in dates]
-    smoothed = [np.mean(rates[max(0,i-2):i+1]) for i in range(len(rates))]
+    smoothed = [np.mean(rates[max(0, i - 2) : i + 1]) for i in range(len(rates))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
-    if mx == 0: mx = 1
+    if mx == 0:
+        mx = 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
-    return _svg(width, height,
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["purple"]}" stroke-width="2.5" stroke-linejoin="round"/>',
-        "Night Owl Index (% sessions 10PM-6AM)")
+        "Night Owl Index (% sessions 10PM-6AM)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1060,7 +1230,7 @@ def marathon_sessions(sessions, width=600, height=200):
     values = [by_date[d] for d in dates]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(values) or 1
 
     bars = ""
@@ -1072,9 +1242,13 @@ def marathon_sessions(sessions, width=600, height=200):
         color = C["rose"] if v > np.percentile(values, 90) else C["indigo"]
         bars += f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" rx="1" fill="{color}" opacity="0.7"/>'
 
-    return _svg(width, height, bars +
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">peak: {max(values):.0f}min</text>',
-        "Longest Session Each Day")
+    return _svg(
+        width,
+        height,
+        bars
+        + f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">peak: {max(values):.0f}min</text>',
+        "Longest Session Each Day",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1103,9 +1277,9 @@ def branch_activity(sessions, width=500, height=280):
         y = m_top + i * row_h
         w = count / mx * pw
         color = PALETTE[i % len(PALETTE)]
-        bars += f'<rect x="{m_left}" y="{y+2:.0f}" width="{w:.0f}" height="{row_h-4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8" font-family="monospace">{name[:18]}</text>'
-        bars += f'<text x="{m_left+w+6:.0f}" y="{y+row_h/2+4:.0f}" fill="{C["text2"]}" font-size="9">{count}</text>'
+        bars += f'<rect x="{m_left}" y="{y + 2:.0f}" width="{w:.0f}" height="{row_h - 4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8" font-family="monospace">{name[:18]}</text>'
+        bars += f'<text x="{m_left + w + 6:.0f}" y="{y + row_h / 2 + 4:.0f}" fill="{C["text2"]}" font-size="9">{count}</text>'
 
     return _svg(width, height, bars, "Git Branch Activity (excl main/master)")
 
@@ -1138,15 +1312,22 @@ def project_concentration(sessions, width=600, height=200):
     ginis = [gini(list(by_week[w].values())) for w in weeks]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(ginis) if ginis else 1
-    if mx == 0: mx = 1
+    if mx == 0:
+        mx = 1
 
-    points = " ".join(f"{m+i/max(len(ginis)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(ginis))
-    return _svg(width, height,
+    points = " ".join(
+        f"{m + i / max(len(ginis) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(ginis)
+    )
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["rose"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<line x1="{m}" y1="{m+ph/2}" x2="{m+pw}" y2="{m+ph/2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>',
-        "Project Concentration (Gini index per week)")
+        f'<line x1="{m}" y1="{m + ph / 2}" x2="{m + pw}" y2="{m + ph / 2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>',
+        "Project Concentration (Gini index per week)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1165,11 +1346,11 @@ def first_session_time(sessions, width=500, height=200):
     values = [by_date[d] for d in dates]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     dots = ""
     for i, v in enumerate(values):
-        x = m + i / max(len(values)-1, 1) * pw
+        x = m + i / max(len(values) - 1, 1) * pw
         y = m + v / 24 * ph  # 0=top (midnight), 24=bottom
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{C["amber"]}" opacity="0.6"/>'
 
@@ -1177,8 +1358,8 @@ def first_session_time(sessions, width=500, height=200):
     labels = ""
     for h in [0, 6, 12, 18, 24]:
         y = m + h / 24 * ph
-        labels += f'<text x="{m-6}" y="{y+4}" text-anchor="end" fill="{C["text2"]}" font-size="9">{h:02d}:00</text>'
-        labels += f'<line x1="{m}" y1="{y}" x2="{m+pw}" y2="{y}" stroke="{C["border"]}" stroke-width="0.5"/>'
+        labels += f'<text x="{m - 6}" y="{y + 4}" text-anchor="end" fill="{C["text2"]}" font-size="9">{h:02d}:00</text>'
+        labels += f'<line x1="{m}" y1="{y}" x2="{m + pw}" y2="{y}" stroke="{C["border"]}" stroke-width="0.5"/>'
 
     return _svg(width, height, labels + dots, "First Session Start Time Each Day")
 
@@ -1230,12 +1411,15 @@ def tool_adoption(sessions, width=600, height=300):
     elems = ""
     for i, (name, first) in enumerate(entries):
         y = m_top + i * row_h
-        x = m_left + (datetime.strptime(first, "%Y-%m-%d") - date_min).days / date_range * pw
+        x = (
+            m_left
+            + (datetime.strptime(first, "%Y-%m-%d") - date_min).days / date_range * pw
+        )
         short = name.replace("mcp__", "").replace("__", ":")[:15]
         color = PALETTE[i % len(PALETTE)]
-        elems += f'<circle cx="{x:.0f}" cy="{y+row_h/2:.0f}" r="5" fill="{color}"/>'
-        elems += f'<line x1="{x:.0f}" y1="{y+row_h/2:.0f}" x2="{m_left+pw}" y2="{y+row_h/2:.0f}" stroke="{color}" stroke-width="1" opacity="0.3"/>'
-        elems += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8" font-family="monospace">{short}</text>'
+        elems += f'<circle cx="{x:.0f}" cy="{y + row_h / 2:.0f}" r="5" fill="{color}"/>'
+        elems += f'<line x1="{x:.0f}" y1="{y + row_h / 2:.0f}" x2="{m_left + pw}" y2="{y + row_h / 2:.0f}" stroke="{color}" stroke-width="1" opacity="0.3"/>'
+        elems += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8" font-family="monospace">{short}</text>'
 
     return _svg(width, height, elems, "Tool Adoption Timeline (first use)")
 
@@ -1268,11 +1452,13 @@ def token_treemap(sessions, width=600, height=300):
         color = PALETTE[i % len(PALETTE)]
         cells += f'<rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{row_h}" rx="6" fill="{color}" opacity="0.6"/>'
         if w > 40:
-            cells += f'<text x="{x+w/2:.0f}" y="{y+row_h/2-4:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="9" font-weight="700">{name[:12]}</text>'
-            cells += f'<text x="{x+w/2:.0f}" y="{y+row_h/2+10:.0f}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{pct*100:.0f}%</text>'
+            cells += f'<text x="{x + w / 2:.0f}" y="{y + row_h / 2 - 4:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="9" font-weight="700">{name[:12]}</text>'
+            cells += f'<text x="{x + w / 2:.0f}" y="{y + row_h / 2 + 10:.0f}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{pct * 100:.0f}%</text>'
         x += w + 4
 
-    return _svg(width, min(y + row_h + 15, height + 100), cells, "Token Distribution by Project")
+    return _svg(
+        width, min(y + row_h + 15, height + 100), cells, "Token Distribution by Project"
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1280,7 +1466,7 @@ def token_treemap(sessions, width=600, height=300):
 # -----------------------------------------------------------------------
 def intensity_scatter(sessions, width=600, height=250):
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     pts = []
     for s in sessions:
@@ -1304,10 +1490,14 @@ def intensity_scatter(sessions, width=600, height=250):
         r = 2 + min(tok / mx_y, 1) * 3
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.1f}" fill="{C["indigo"]}" opacity="0.35"/>'
 
-    return _svg(width, height, dots +
-        f'<text x="{m+pw/2}" y="{m+ph+16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Duration (min)</text>'
-        f'<text x="{m-8}" y="{m+ph/2}" text-anchor="middle" fill="{C["text2"]}" font-size="9" transform="rotate(-90 {m-8} {m+ph/2})">Tokens</text>',
-        "Session Intensity (Duration × Tokens)")
+    return _svg(
+        width,
+        height,
+        dots
+        + f'<text x="{m + pw / 2}" y="{m + ph + 16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Duration (min)</text>'
+        f'<text x="{m - 8}" y="{m + ph / 2}" text-anchor="middle" fill="{C["text2"]}" font-size="9" transform="rotate(-90 {m - 8} {m + ph / 2})">Tokens</text>',
+        "Session Intensity (Duration × Tokens)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1335,7 +1525,7 @@ def weekly_stacked(sessions, width=600, height=220):
     top5 = [p for p, _ in overall.most_common(5)]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     # Build stacked areas from bottom up
     areas = ""
@@ -1352,7 +1542,7 @@ def weekly_stacked(sessions, width=600, height=220):
         top_pts = []
         bot_pts = []
         for i in range(len(weeks)):
-            x = m + i / max(len(weeks)-1, 1) * pw
+            x = m + i / max(len(weeks) - 1, 1) * pw
             yt = m + ph - new_prev[i] / max_stack * ph
             yb = m + ph - prev[i] / max_stack * ph
             top_pts.append(f"{x:.1f},{yt:.1f}")
@@ -1367,8 +1557,8 @@ def weekly_stacked(sessions, width=600, height=220):
     legend = ""
     for i, proj in enumerate(top5):
         lx = m + i * 110
-        legend += f'<rect x="{lx}" y="{m+ph+8}" width="8" height="8" rx="2" fill="{PALETTE[i % len(PALETTE)]}"/>'
-        legend += f'<text x="{lx+12}" y="{m+ph+16}" fill="{C["text2"]}" font-size="8">{proj[:12]}</text>'
+        legend += f'<rect x="{lx}" y="{m + ph + 8}" width="8" height="8" rx="2" fill="{PALETTE[i % len(PALETTE)]}"/>'
+        legend += f'<text x="{lx + 12}" y="{m + ph + 16}" fill="{C["text2"]}" font-size="8">{proj[:12]}</text>'
 
     return _svg(width, height, areas + legend, "Weekly Stacked (Top 5 Projects)")
 
@@ -1385,19 +1575,26 @@ def response_ratio(sessions, width=600, height=200):
     if not dates:
         return ""
     ratios = [by_date[d][1] / max(by_date[d][0], 1) for d in dates]
-    smoothed = [np.mean(ratios[max(0,i-2):i+1]) for i in range(len(ratios))]
+    smoothed = [np.mean(ratios[max(0, i - 2) : i + 1]) for i in range(len(ratios))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
-    if mx == 0: mx = 1
+    if mx == 0:
+        mx = 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
-    return _svg(width, height,
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["blue"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<line x1="{m}" y1="{m+ph/2}" x2="{m+pw}" y2="{m+ph/2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.1f}x</text>',
-        "Claude/You Response Ratio (3-day rolling)")
+        f'<line x1="{m}" y1="{m + ph / 2}" x2="{m + pw}" y2="{m + ph / 2}" stroke="{C["border"]}" stroke-dasharray="4 4"/>'
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.1f}x</text>',
+        "Claude/You Response Ratio (3-day rolling)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1415,21 +1612,27 @@ def prompt_evolution(sessions, width=600, height=200):
     if len(dates) < 5:
         return ""
     values = [np.mean(by_date[d]) for d in dates]
-    smoothed = [np.mean(values[max(0,i-4):i+1]) for i in range(len(values))]
+    smoothed = [np.mean(values[max(0, i - 4) : i + 1]) for i in range(len(values))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) or 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
     # Trend arrow
     delta = smoothed[-1] - smoothed[0]
     trend = "longer" if delta > 0 else "shorter"
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["amber"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.0f} tok/msg ({trend})</text>',
-        "Prompt Sophistication (tokens per user message)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.0f} tok/msg ({trend})</text>',
+        "Prompt Sophistication (tokens per user message)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1456,26 +1659,29 @@ def focus_score(sessions, width=600, height=200):
         max_ent = math.log2(len(counts)) if len(counts) > 1 else 1
         scores.append(1 - ent / max_ent if max_ent > 0 else 1.0)
 
-    smoothed = [np.mean(scores[max(0,i-4):i+1]) for i in range(len(scores))]
+    smoothed = [np.mean(scores[max(0, i - 4) : i + 1]) for i in range(len(scores))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     # Color gradient from red (scattered) to green (focused)
     points = []
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1,1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         y = m + ph - v * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="fsg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["green"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#fsg)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["green"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<line x1="{m}" y1="{m+ph*0.5}" x2="{m+pw}" y2="{m+ph*0.5}" stroke="{C["border"]}" stroke-dasharray="4 4"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">Today: {smoothed[-1]:.0%}</text>',
-        "Daily Focus Score (1.0 = one project, 0 = scattered)")
+        f'<line x1="{m}" y1="{m + ph * 0.5}" x2="{m + pw}" y2="{m + ph * 0.5}" stroke="{C["border"]}" stroke-dasharray="4 4"/>'
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">Today: {smoothed[-1]:.0%}</text>',
+        "Daily Focus Score (1.0 = one project, 0 = scattered)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1506,10 +1712,10 @@ def project_gravity(sessions, width=600, height=300):
         total = sum(1 for s in sessions if s.get("repo") == name)
         r = min(3 + total / 50, 12)
         color = PALETTE[i % len(PALETTE)]
-        bars += f'<rect x="{m_left}" y="{y+row_h*0.25:.0f}" width="{w:.0f}" height="{row_h*0.5:.0f}" rx="4" fill="{color}" opacity="0.6"/>'
-        bars += f'<circle cx="{m_left+w+r+4:.0f}" cy="{y+row_h/2:.0f}" r="{r:.0f}" fill="{color}" opacity="0.8"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
-        bars += f'<text x="{m_left+w+r*2+10:.0f}" y="{y+row_h/2+4:.0f}" fill="{C["text2"]}" font-size="9">{days}d · {total} sessions</text>'
+        bars += f'<rect x="{m_left}" y="{y + row_h * 0.25:.0f}" width="{w:.0f}" height="{row_h * 0.5:.0f}" rx="4" fill="{color}" opacity="0.6"/>'
+        bars += f'<circle cx="{m_left + w + r + 4:.0f}" cy="{y + row_h / 2:.0f}" r="{r:.0f}" fill="{color}" opacity="0.8"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
+        bars += f'<text x="{m_left + w + r * 2 + 10:.0f}" y="{y + row_h / 2 + 4:.0f}" fill="{C["text2"]}" font-size="9">{days}d · {total} sessions</text>'
 
     return _svg(width, height, bars, "Project Gravity (distinct days you returned)")
 
@@ -1531,7 +1737,7 @@ def momentum_streaks(sessions, width=600, height=250):
         current_streak = 1
         best_streak = 1
         for i in range(1, len(sorted_dates)):
-            prev = datetime.strptime(sorted_dates[i-1], "%Y-%m-%d")
+            prev = datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d")
             curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d")
             if (curr - prev).days == 1:
                 current_streak += 1
@@ -1560,11 +1766,11 @@ def momentum_streaks(sessions, width=600, height=250):
         dot_spacing = min(w / max(streak, 1), 14)
         for d in range(streak):
             dx = m_left + d * dot_spacing
-            bars += f'<circle cx="{dx+6:.0f}" cy="{y+row_h/2:.0f}" r="4" fill="{color}" opacity="0.8"/>'
+            bars += f'<circle cx="{dx + 6:.0f}" cy="{y + row_h / 2:.0f}" r="4" fill="{color}" opacity="0.8"/>'
             if d > 0:
-                bars += f'<line x1="{dx+6-dot_spacing:.0f}" y1="{y+row_h/2:.0f}" x2="{dx+6:.0f}" y2="{y+row_h/2:.0f}" stroke="{color}" stroke-width="2" opacity="0.4"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
-        bars += f'<text x="{m_left+streak*dot_spacing+14:.0f}" y="{y+row_h/2+4:.0f}" fill="{C["text"]}" font-size="10" font-weight="700">{streak}d</text>'
+                bars += f'<line x1="{dx + 6 - dot_spacing:.0f}" y1="{y + row_h / 2:.0f}" x2="{dx + 6:.0f}" y2="{y + row_h / 2:.0f}" stroke="{color}" stroke-width="2" opacity="0.4"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
+        bars += f'<text x="{m_left + streak * dot_spacing + 14:.0f}" y="{y + row_h / 2 + 4:.0f}" fill="{C["text"]}" font-size="10" font-weight="700">{streak}d</text>'
 
     return _svg(width, height, bars, "Momentum Streaks (consecutive days on project)")
 
@@ -1589,7 +1795,7 @@ def throughput_by_hour(sessions, width=500, height=220):
     mx = max(rates.values()) or 1
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 20
+    pw, ph = width - 2 * m, height - 2 * m - 20
     bar_w = pw / 24 - 2
 
     bars = ""
@@ -1602,10 +1808,18 @@ def throughput_by_hour(sessions, width=500, height=220):
         color = C["green"] if h == peak_h else C["indigo"]
         bars += f'<rect x="{x:.0f}" y="{y:.0f}" width="{bar_w:.0f}" height="{bh:.0f}" rx="2" fill="{color}" opacity="0.7"/>'
 
-    labels = "".join(f'<text x="{m + h*(bar_w+2) + bar_w/2:.0f}" y="{m+10+ph+13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>' for h in range(0, 24, 3))
-    return _svg(width, height, bars + labels +
-        f'<text x="{m+pw}" y="{m}" text-anchor="end" fill="{C["green"]}" font-size="10" font-weight="700">Peak: {peak_h:02d}:00</text>',
-        "Throughput (output tokens/min by hour)")
+    labels = "".join(
+        f'<text x="{m + h * (bar_w + 2) + bar_w / 2:.0f}" y="{m + 10 + ph + 13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>'
+        for h in range(0, 24, 3)
+    )
+    return _svg(
+        width,
+        height,
+        bars
+        + labels
+        + f'<text x="{m + pw}" y="{m}" text-anchor="end" fill="{C["green"]}" font-size="10" font-weight="700">Peak: {peak_h:02d}:00</text>',
+        "Throughput (output tokens/min by hour)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1634,7 +1848,7 @@ def multitask_penalty(sessions, width=500, height=250):
     arr = np.array(pts)
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx_x = arr[:, 0].max()
     mx_y = np.percentile(arr[:, 1], 95)
 
@@ -1647,17 +1861,22 @@ def multitask_penalty(sessions, width=500, height=250):
 
     # Add correlation line
     corr = np.corrcoef(arr[:, 0], arr[:, 1])[0, 1]
-    corr_label = f'r={corr:.2f} {"(penalty!)" if corr < -0.1 else "(no penalty)" if abs(corr) < 0.1 else "(bonus!)"}'
+    corr_label = f"r={corr:.2f} {'(penalty!)' if corr < -0.1 else '(no penalty)' if abs(corr) < 0.1 else '(bonus!)'}"
 
     labels = ""
     for i in range(1, int(mx_x) + 1, max(1, int(mx_x) // 6)):
         x = m + (i - 1) / max(mx_x - 1, 1) * pw
-        labels += f'<text x="{x:.0f}" y="{m+ph+16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{i}</text>'
+        labels += f'<text x="{x:.0f}" y="{m + ph + 16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{i}</text>'
 
-    return _svg(width, height, dots + labels +
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{corr_label}</text>'
-        f'<text x="{m+pw/2}" y="{m+ph+30}" text-anchor="middle" fill="{C["text2"]}" font-size="9">projects touched that day</text>',
-        "Multi-tasking Effect (projects/day vs avg tokens)")
+    return _svg(
+        width,
+        height,
+        dots
+        + labels
+        + f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{corr_label}</text>'
+        f'<text x="{m + pw / 2}" y="{m + ph + 30}" text-anchor="middle" fill="{C["text2"]}" font-size="9">projects touched that day</text>',
+        "Multi-tasking Effect (projects/day vs avg tokens)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1676,11 +1895,16 @@ def tool_evolution(sessions, width=600, height=250):
         if not isinstance(tools, dict):
             continue
         for name, count in tools.items():
-            if name in read_tools: cats_by_month[month]["Read"] += count
-            elif name in write_tools: cats_by_month[month]["Write"] += count
-            elif name in exec_tools: cats_by_month[month]["Exec"] += count
-            elif name == "Agent": cats_by_month[month]["Agent"] += count
-            elif name.startswith("mcp__"): cats_by_month[month]["MCP"] += count
+            if name in read_tools:
+                cats_by_month[month]["Read"] += count
+            elif name in write_tools:
+                cats_by_month[month]["Write"] += count
+            elif name in exec_tools:
+                cats_by_month[month]["Exec"] += count
+            elif name == "Agent":
+                cats_by_month[month]["Agent"] += count
+            elif name.startswith("mcp__"):
+                cats_by_month[month]["MCP"] += count
 
     months = sorted(cats_by_month.keys())
     if len(months) < 2:
@@ -1690,7 +1914,7 @@ def tool_evolution(sessions, width=600, height=250):
     cat_colors = [C["cyan"], C["indigo"], C["green"], C["purple"], C["pink"]]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 20
+    pw, ph = width - 2 * m, height - 2 * m - 20
     max_total = max(sum(cats_by_month[mo].values()) for mo in months) or 1
 
     areas = ""
@@ -1702,7 +1926,7 @@ def tool_evolution(sessions, width=600, height=250):
         top_pts = []
         bot_pts = []
         for i in range(len(months)):
-            x = m + i / max(len(months)-1, 1) * pw
+            x = m + i / max(len(months) - 1, 1) * pw
             yt = m + 10 + ph - new_prev[i] / max_total * ph
             yb = m + 10 + ph - prev[i] / max_total * ph
             top_pts.append(f"{x:.1f},{yt:.1f}")
@@ -1714,13 +1938,16 @@ def tool_evolution(sessions, width=600, height=250):
         prev = new_prev
 
     # X labels
-    labels = "".join(f'<text x="{m+i/max(len(months)-1,1)*pw:.0f}" y="{m+10+ph+14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{mo[5:]}</text>' for i, mo in enumerate(months))
+    labels = "".join(
+        f'<text x="{m + i / max(len(months) - 1, 1) * pw:.0f}" y="{m + 10 + ph + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{mo[5:]}</text>'
+        for i, mo in enumerate(months)
+    )
     # Legend
     legend = ""
     for i, cat in enumerate(categories):
         lx = m + i * 75
-        legend += f'<rect x="{lx}" y="{m-2}" width="8" height="8" rx="2" fill="{cat_colors[i]}"/>'
-        legend += f'<text x="{lx+12}" y="{m+6}" fill="{C["text2"]}" font-size="8">{cat}</text>'
+        legend += f'<rect x="{lx}" y="{m - 2}" width="8" height="8" rx="2" fill="{cat_colors[i]}"/>'
+        legend += f'<text x="{lx + 12}" y="{m + 6}" fill="{C["text2"]}" font-size="8">{cat}</text>'
 
     return _svg(width, height, areas + labels + legend, "")
 
@@ -1734,7 +1961,7 @@ def recovery_time(sessions, width=500, height=220):
     pts = []
     for i in range(len(sorted_s) - 1):
         dur = sorted_s[i].get("duration_mins", 0)
-        gap = (sorted_s[i+1].get("first_ts", 0) - sorted_s[i].get("last_ts", 0)) / 60
+        gap = (sorted_s[i + 1].get("first_ts", 0) - sorted_s[i].get("last_ts", 0)) / 60
         if dur > 5 and 0 < gap < 1440:
             pts.append((dur, gap))
 
@@ -1743,7 +1970,7 @@ def recovery_time(sessions, width=500, height=220):
     arr = np.array(pts)
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx_x = np.percentile(arr[:, 0], 95)
     mx_y = np.percentile(arr[:, 1], 95)
 
@@ -1756,10 +1983,14 @@ def recovery_time(sessions, width=500, height=220):
         dots += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{C["teal"]}" opacity="0.35"/>'
 
     corr = np.corrcoef(arr[:, 0], arr[:, 1])[0, 1]
-    return _svg(width, height, dots +
-        f'<text x="{m+pw/2}" y="{m+ph+16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Session duration (min)</text>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">r={corr:.2f}</text>',
-        "Recovery Time (gap after session vs duration)")
+    return _svg(
+        width,
+        height,
+        dots
+        + f'<text x="{m + pw / 2}" y="{m + ph + 16}" text-anchor="middle" fill="{C["text2"]}" font-size="9">Session duration (min)</text>'
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">r={corr:.2f}</text>',
+        "Recovery Time (gap after session vs duration)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -1795,21 +2026,24 @@ def project_lifecycle(sessions, width=700, height=300):
         values = [counts.get(d, 0) for d in all_dates]
         # Bucket by week
         bucket_size = max(len(values) // 50, 1)
-        bucketed = [sum(values[i:i+bucket_size]) for i in range(0, len(values), bucket_size)]
+        bucketed = [
+            sum(values[i : i + bucket_size]) for i in range(0, len(values), bucket_size)
+        ]
         mx_b = max(bucketed) if bucketed else 1
-        if mx_b == 0: mx_b = 1
+        if mx_b == 0:
+            mx_b = 1
 
         points = []
         for i, v in enumerate(bucketed):
-            x = m_left + i / max(len(bucketed)-1, 1) * pw
+            x = m_left + i / max(len(bucketed) - 1, 1) * pw
             y = y_base - v / mx_b * (row_h * 0.4)
             points.append(f"{x:.1f},{y:.1f}")
 
-        fill_pts = f"{m_left},{y_base} " + " ".join(points) + f" {m_left+pw},{y_base}"
+        fill_pts = f"{m_left},{y_base} " + " ".join(points) + f" {m_left + pw},{y_base}"
         color = PALETTE[pi % len(PALETTE)]
         lines += f'<polygon points="{fill_pts}" fill="{color}" opacity="0.2"/>'
         lines += f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="1.5" stroke-linejoin="round"/>'
-        lines += f'<text x="{m_left-6}" y="{y_base+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{repo[:16]}</text>'
+        lines += f'<text x="{m_left - 6}" y="{y_base + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{repo[:16]}</text>'
 
     return _svg(width, height, lines, "Project Lifecycles (activity sparklines)")
 
@@ -1834,26 +2068,30 @@ def delegation_index(sessions, width=600, height=200):
     if len(dates) < 5:
         return ""
     ratios = [by_date[d][0] / max(by_date[d][1], 1) * 100 for d in dates]
-    smoothed = [np.mean(ratios[max(0,i-4):i+1]) for i in range(len(ratios))]
+    smoothed = [np.mean(ratios[max(0, i - 4) : i + 1]) for i in range(len(ratios))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
-    if mx == 0: mx = 1
+    if mx == 0:
+        mx = 1
 
     points = []
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1,1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         y = m + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="delg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["purple"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#delg)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["purple"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.0f}% delegation</text>',
-        "Delegation Index (% of tool calls that are Agent)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{smoothed[-1]:.0f}% delegation</text>',
+        "Delegation Index (% of tool calls that are Agent)",
+    )
 
 
 def _extract_org(path: str) -> str:
@@ -1882,7 +2120,7 @@ def org_breakdown(sessions, width=500, height=280):
     total = sum(c for _, c in top)
     total_tok = sum(org_tokens.values()) or 1
 
-    cx, cy, r = width/2, 130, 90
+    cx, cy, r = width / 2, 130, 90
     circumference = 2 * math.pi * r
     arcs = ""
     offset = 0
@@ -1896,10 +2134,10 @@ def org_breakdown(sessions, width=500, height=280):
         tok_pct = org_tokens[org] / total_tok * 100
         ly = cy + r + 20 + i * 14
         legend += f'<circle cx="20" cy="{ly}" r="4" fill="{color}"/>'
-        legend += f'<text x="30" y="{ly+4}" fill="{C["text2"]}" font-size="9">{org} — {count} sessions ({pct:.0f}%) · {tok_pct:.0f}% tokens</text>'
+        legend += f'<text x="30" y="{ly + 4}" fill="{C["text2"]}" font-size="9">{org} — {count} sessions ({pct:.0f}%) · {tok_pct:.0f}% tokens</text>'
 
-    arcs += f'<text x="{cx}" y="{cy-4}" text-anchor="middle" fill="{C["text"]}" font-size="18" font-weight="800">{len(set(_extract_org(s.get("project_short","")) for s in sessions))}</text>'
-    arcs += f'<text x="{cx}" y="{cy+14}" text-anchor="middle" fill="{C["text2"]}" font-size="10">orgs</text>'
+    arcs += f'<text x="{cx}" y="{cy - 4}" text-anchor="middle" fill="{C["text"]}" font-size="18" font-weight="800">{len(set(_extract_org(s.get("project_short", "")) for s in sessions))}</text>'
+    arcs += f'<text x="{cx}" y="{cy + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="10">orgs</text>'
 
     return _svg(width, max(height, cy + r + 30 + len(top) * 14), arcs + legend, "")
 
@@ -1930,7 +2168,7 @@ def org_timeline(sessions, width=700, height=250):
     top5 = [o for o, _ in overall.most_common(5)]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 20
+    pw, ph = width - 2 * m, height - 2 * m - 20
     max_stack = max(sum(by_week_org[w].values()) for w in weeks) or 1
 
     areas = ""
@@ -1941,7 +2179,7 @@ def org_timeline(sessions, width=700, height=250):
         top_pts = []
         bot_pts = []
         for i in range(len(weeks)):
-            x = m + i / max(len(weeks)-1, 1) * pw
+            x = m + i / max(len(weeks) - 1, 1) * pw
             yt = m + 10 + ph - new_prev[i] / max_stack * ph
             yb = m + 10 + ph - prev[i] / max_stack * ph
             top_pts.append(f"{x:.1f},{yt:.1f}")
@@ -1954,15 +2192,15 @@ def org_timeline(sessions, width=700, height=250):
     legend = ""
     for i, org in enumerate(top5):
         lx = m + i * 110
-        legend += f'<rect x="{lx}" y="{m-2}" width="8" height="8" rx="2" fill="{PALETTE[i % len(PALETTE)]}"/>'
-        legend += f'<text x="{lx+12}" y="{m+6}" fill="{C["text2"]}" font-size="8">{org[:12]}</text>'
+        legend += f'<rect x="{lx}" y="{m - 2}" width="8" height="8" rx="2" fill="{PALETTE[i % len(PALETTE)]}"/>'
+        legend += f'<text x="{lx + 12}" y="{m + 6}" fill="{C["text2"]}" font-size="8">{org[:12]}</text>'
 
     # Month labels
     labels = ""
     for i, w in enumerate(weeks):
         if i % max(len(weeks) // 6, 1) == 0:
-            x = m + i / max(len(weeks)-1, 1) * pw
-            labels += f'<text x="{x:.0f}" y="{m+10+ph+14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{w[5:]}</text>'
+            x = m + i / max(len(weeks) - 1, 1) * pw
+            labels += f'<text x="{x:.0f}" y="{m + 10 + ph + 14}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{w[5:]}</text>'
 
     return _svg(width, height, areas + legend + labels, "Org Activity Over Time")
 
@@ -1985,7 +2223,19 @@ def repo_leaderboard(sessions, width=700, height=400):
         repo_hours[repo] += s.get("duration_mins", 0) / 60
 
     top_repos = sorted(repo_sessions, key=lambda r: repo_sessions[r], reverse=True)[:15]
-    top = [(r, {"sessions": repo_sessions[r], "tokens": repo_tokens[r], "tools": repo_tools[r], "days": repo_days[r], "hours": repo_hours[r]}) for r in top_repos]
+    top = [
+        (
+            r,
+            {
+                "sessions": repo_sessions[r],
+                "tokens": repo_tokens[r],
+                "tools": repo_tools[r],
+                "days": repo_days[r],
+                "hours": repo_hours[r],
+            },
+        )
+        for r in top_repos
+    ]
     if not top:
         return ""
 
@@ -2003,20 +2253,24 @@ def repo_leaderboard(sessions, width=700, height=400):
         w_tok = d["tokens"] / mx_tokens * pw * 0.6
         color = PALETTE[i % len(PALETTE)]
 
-        bars += f'<rect x="{m_left}" y="{y+2:.0f}" width="{w_sess:.0f}" height="{row_h*0.4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
-        bars += f'<rect x="{m_left}" y="{y+row_h*0.5:.0f}" width="{w_tok:.0f}" height="{row_h*0.3:.0f}" rx="2" fill="{color}" opacity="0.35"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
+        bars += f'<rect x="{m_left}" y="{y + 2:.0f}" width="{w_sess:.0f}" height="{row_h * 0.4:.0f}" rx="3" fill="{color}" opacity="0.7"/>'
+        bars += f'<rect x="{m_left}" y="{y + row_h * 0.5:.0f}" width="{w_tok:.0f}" height="{row_h * 0.3:.0f}" rx="2" fill="{color}" opacity="0.35"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9">{name[:16]}</text>'
 
         # Stats at end
         days = len(d["days"])
-        bars += f'<text x="{m_left+pw}" y="{y+row_h*0.35:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8">{d["sessions"]} sess · {days}d · {d["hours"]:.0f}h · {d["tokens"]/1e6:.1f}M tok</text>'
+        bars += f'<text x="{m_left + pw}" y="{y + row_h * 0.35:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="8">{d["sessions"]} sess · {days}d · {d["hours"]:.0f}h · {d["tokens"] / 1e6:.1f}M tok</text>'
 
-    return _svg(width, height, bars +
-        f'<rect x="{m_left}" y="{m_top-16}" width="8" height="8" rx="2" fill="{C["indigo"]}"/>'
-        f'<text x="{m_left+12}" y="{m_top-8}" fill="{C["text2"]}" font-size="8">sessions</text>'
-        f'<rect x="{m_left+80}" y="{m_top-16}" width="8" height="8" rx="2" fill="{C["indigo"]}" opacity="0.35"/>'
-        f'<text x="{m_left+92}" y="{m_top-8}" fill="{C["text2"]}" font-size="8">tokens</text>',
-        "Repo Leaderboard")
+    return _svg(
+        width,
+        height,
+        bars
+        + f'<rect x="{m_left}" y="{m_top - 16}" width="8" height="8" rx="2" fill="{C["indigo"]}"/>'
+        f'<text x="{m_left + 12}" y="{m_top - 8}" fill="{C["text2"]}" font-size="8">sessions</text>'
+        f'<rect x="{m_left + 80}" y="{m_top - 16}" width="8" height="8" rx="2" fill="{C["indigo"]}" opacity="0.35"/>'
+        f'<text x="{m_left + 92}" y="{m_top - 8}" fill="{C["text2"]}" font-size="8">tokens</text>',
+        "Repo Leaderboard",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2046,12 +2300,12 @@ def org_hour_heatmap(sessions, width=600, height=250):
             alpha = 0.05 + 0.95 * (v / mx)
             x = m_left + h * cw
             y = m_top + oi * ch
-            cells += f'<rect x="{x:.1f}" y="{y:.1f}" width="{cw-1:.1f}" height="{ch-1:.1f}" rx="3" fill="rgba(99,102,241,{alpha:.2f})"/>'
-        cells += f'<text x="{m_left-6}" y="{m_top + oi*ch + ch/2 + 4}" text-anchor="end" fill="{C["text2"]}" font-size="9">{org[:12]}</text>'
+            cells += f'<rect x="{x:.1f}" y="{y:.1f}" width="{cw - 1:.1f}" height="{ch - 1:.1f}" rx="3" fill="rgba(99,102,241,{alpha:.2f})"/>'
+        cells += f'<text x="{m_left - 6}" y="{m_top + oi * ch + ch / 2 + 4}" text-anchor="end" fill="{C["text2"]}" font-size="9">{org[:12]}</text>'
 
     labels = ""
     for h in range(0, 24, 3):
-        labels += f'<text x="{m_left + h*cw + cw/2}" y="{m_top - 6}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
+        labels += f'<text x="{m_left + h * cw + cw / 2}" y="{m_top - 6}" text-anchor="middle" fill="{C["text2"]}" font-size="9">{h:02d}</text>'
 
     return _svg(width, height, cells + labels, "Org × Hour Heatmap")
 
@@ -2089,7 +2343,7 @@ def repo_churn(sessions, width=600, height=200):
         cumulative.append(total)
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     # Bar for new repos per week
     mx = max(values) or 1
@@ -2103,12 +2357,20 @@ def repo_churn(sessions, width=600, height=200):
 
     # Cumulative line overlay
     mx_c = max(cumulative) or 1
-    points = " ".join(f"{m+i*(bar_w+2)+bar_w/2:.1f},{m+ph-v/mx_c*ph:.1f}" for i, v in enumerate(cumulative))
+    points = " ".join(
+        f"{m + i * (bar_w + 2) + bar_w / 2:.1f},{m + ph - v / mx_c * ph:.1f}"
+        for i, v in enumerate(cumulative)
+    )
     line = f'<polyline points="{points}" fill="none" stroke="{C["amber"]}" stroke-width="2" stroke-linejoin="round"/>'
 
-    return _svg(width, height, bars + line +
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{total} repos discovered</text>',
-        "Repo Discovery Rate (new repos per week + cumulative)")
+    return _svg(
+        width,
+        height,
+        bars
+        + line
+        + f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">{total} repos discovered</text>',
+        "Repo Discovery Rate (new repos per week + cumulative)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2120,7 +2382,9 @@ def org_repo_treemap(sessions, width=600, height=300):
         org = _extract_org(s.get("project_short", ""))
         org_repos[org][s.get("repo", "?")] += 1
 
-    top_orgs = sorted(org_repos, key=lambda o: sum(org_repos[o].values()), reverse=True)[:6]
+    top_orgs = sorted(
+        org_repos, key=lambda o: sum(org_repos[o].values()), reverse=True
+    )[:6]
     if not top_orgs:
         return ""
 
@@ -2137,7 +2401,7 @@ def org_repo_treemap(sessions, width=600, height=300):
         color = PALETTE[oi % len(PALETTE)]
 
         # Org label
-        cells += f'<text x="{m}" y="{y-4}" fill="{C["text"]}" font-size="10" font-weight="700">{org}</text>'
+        cells += f'<text x="{m}" y="{y - 4}" fill="{C["text"]}" font-size="10" font-weight="700">{org}</text>'
 
         for ri, (repo, count) in enumerate(repos):
             pct = count / total
@@ -2146,8 +2410,8 @@ def org_repo_treemap(sessions, width=600, height=300):
                 break
             cells += f'<rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{row_h}" rx="4" fill="{color}" opacity="{0.3 + 0.5 * pct:.2f}"/>'
             if w > 40:
-                cells += f'<text x="{x+w/2:.0f}" y="{y+row_h/2-2:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="8" font-weight="600">{repo[:10]}</text>'
-                cells += f'<text x="{x+w/2:.0f}" y="{y+row_h/2+10:.0f}" text-anchor="middle" fill="{C["text2"]}" font-size="7">{count}</text>'
+                cells += f'<text x="{x + w / 2:.0f}" y="{y + row_h / 2 - 2:.0f}" text-anchor="middle" fill="{C["text"]}" font-size="8" font-weight="600">{repo[:10]}</text>'
+                cells += f'<text x="{x + w / 2:.0f}" y="{y + row_h / 2 + 10:.0f}" text-anchor="middle" fill="{C["text2"]}" font-size="7">{count}</text>'
             x += w + 3
 
         y += row_h + 20
@@ -2172,22 +2436,31 @@ def org_switches(sessions, width=500, height=200):
     switches = []
     for d in dates:
         orgs_today = by_date[d]
-        sw = sum(1 for i in range(1, len(orgs_today)) if orgs_today[i] != orgs_today[i-1])
+        sw = sum(
+            1 for i in range(1, len(orgs_today)) if orgs_today[i] != orgs_today[i - 1]
+        )
         switches.append(sw)
 
-    smoothed = [np.mean(switches[max(0,i-4):i+1]) for i in range(len(switches))]
+    smoothed = [np.mean(switches[max(0, i - 4) : i + 1]) for i in range(len(switches))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) if smoothed else 1
-    if mx == 0: mx = 1
+    if mx == 0:
+        mx = 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
     avg = np.mean(switches)
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{C["rose"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">avg {avg:.1f} switches/day</text>',
-        "Cross-Org Context Switches per Day")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{C["text"]}" font-size="10" font-weight="700">avg {avg:.1f} switches/day</text>',
+        "Cross-Org Context Switches per Day",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2234,10 +2507,12 @@ def human_output(sessions, width=700, height=280):
 
     # Human equivalent: senior dev ≈ 60 units/day
     human_equiv = [s / 60 for s in scores]
-    smoothed = [np.mean(human_equiv[max(0,i-2):i+1]) for i in range(len(human_equiv))]
+    smoothed = [
+        np.mean(human_equiv[max(0, i - 2) : i + 1]) for i in range(len(human_equiv))
+    ]
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m - 40
+    pw, ph = width - 2 * m, height - 2 * m - 40
 
     # Bars for raw daily output
     mx = max(human_equiv) or 1
@@ -2251,14 +2526,17 @@ def human_output(sessions, width=700, height=280):
         bars += f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" rx="1" fill="{color}" opacity="0.6"/>'
 
     # Smoothed line
-    points = " ".join(f"{m+i*(bar_w+1)+bar_w/2:.1f},{m+20+ph-min(v/mx,1)*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i * (bar_w + 1) + bar_w / 2:.1f},{m + 20 + ph - min(v / mx, 1) * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
     line = f'<polyline points="{points}" fill="none" stroke="{C["text"]}" stroke-width="2" stroke-linejoin="round"/>'
 
     # 1x human line
     if mx > 0:
         y_1x = m + 20 + ph - 1.0 / mx * ph
-        ref_line = f'<line x1="{m}" y1="{y_1x:.0f}" x2="{m+pw}" y2="{y_1x:.0f}" stroke="{C["green"]}" stroke-dasharray="6 3" opacity="0.5"/>'
-        ref_label = f'<text x="{m+pw+4}" y="{y_1x+4:.0f}" fill="{C["green"]}" font-size="9" font-weight="700">1x dev</text>'
+        ref_line = f'<line x1="{m}" y1="{y_1x:.0f}" x2="{m + pw}" y2="{y_1x:.0f}" stroke="{C["green"]}" stroke-dasharray="6 3" opacity="0.5"/>'
+        ref_label = f'<text x="{m + pw + 4}" y="{y_1x + 4:.0f}" fill="{C["green"]}" font-size="9" font-weight="700">1x dev</text>'
     else:
         ref_line = ref_label = ""
 
@@ -2267,16 +2545,20 @@ def human_output(sessions, width=700, height=280):
     peak = max(human_equiv)
 
     stats = (
-        f'<text x="{m}" y="{m+20+ph+20}" fill="{C["text2"]}" font-size="10">'
+        f'<text x="{m}" y="{m + 20 + ph + 20}" fill="{C["text2"]}" font-size="10">'
         f'Avg: <tspan fill="{C["text"]}" font-weight="700">{avg_he:.1f}x</tspan> dev/day · '
         f'Peak: <tspan fill="{C["amber"]}" font-weight="700">{peak:.1f}x</tspan> · '
-        f'{total_days} active days · '
+        f"{total_days} active days · "
         f'Total: <tspan fill="{C["green"]}" font-weight="700">{sum(human_equiv):.0f}</tspan> dev-days equivalent'
-        f'</text>'
+        f"</text>"
     )
 
-    return _svg(width, height, bars + line + ref_line + ref_label + stats,
-        "Human-Equivalent Output per Day (1x = senior dev)")
+    return _svg(
+        width,
+        height,
+        bars + line + ref_line + ref_label + stats,
+        "Human-Equivalent Output per Day (1x = senior dev)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2308,7 +2590,7 @@ def output_composition(sessions, width=600, height=220):
     cat_colors = [C["indigo"], C["cyan"], C["green"]]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m - 20
+    pw, ph = width - 2 * m, height - 2 * m - 20
     max_total = max(sum(by_date[d]) for d in dates) or 1
 
     areas = ""
@@ -2319,7 +2601,7 @@ def output_composition(sessions, width=600, height=220):
         top_pts = []
         bot_pts = []
         for i in range(len(dates)):
-            x = m + i / max(len(dates)-1, 1) * pw
+            x = m + i / max(len(dates) - 1, 1) * pw
             yt = m + 10 + ph - new_prev[i] / max_total * ph
             yb = m + 10 + ph - prev[i] / max_total * ph
             top_pts.append(f"{x:.1f},{yt:.1f}")
@@ -2331,8 +2613,8 @@ def output_composition(sessions, width=600, height=220):
     legend = ""
     for i, cat in enumerate(categories):
         lx = m + i * 130
-        legend += f'<rect x="{lx}" y="{m-2}" width="8" height="8" rx="2" fill="{cat_colors[i]}"/>'
-        legend += f'<text x="{lx+12}" y="{m+6}" fill="{C["text2"]}" font-size="8">{cat}</text>'
+        legend += f'<rect x="{lx}" y="{m - 2}" width="8" height="8" rx="2" fill="{cat_colors[i]}"/>'
+        legend += f'<text x="{lx + 12}" y="{m + 6}" fill="{C["text2"]}" font-size="8">{cat}</text>'
 
     return _svg(width, height, areas + legend, "")
 
@@ -2349,11 +2631,20 @@ def leverage_points(sessions, width=700, height=400):
     - Duration increasing over time = growing complexity
     - Many sessions, few edits = overhead-heavy workflow
     """
-    proj_data = defaultdict(lambda: {
-        "sessions": 0, "total_dur": 0.0, "reads": 0, "writes": 0,
-        "revisit_days": set(), "short_sessions": 0,
-        "durations": [], "dates": [], "edits": 0, "tokens": 0
-    })
+    proj_data = defaultdict(
+        lambda: {
+            "sessions": 0,
+            "total_dur": 0.0,
+            "reads": 0,
+            "writes": 0,
+            "revisit_days": set(),
+            "short_sessions": 0,
+            "durations": [],
+            "dates": [],
+            "edits": 0,
+            "tokens": 0,
+        }
+    )
     read_tools = {"Read", "Glob", "Grep", "LS"}
     write_tools = {"Edit", "Write", "NotebookEdit"}
 
@@ -2402,10 +2693,12 @@ def leverage_points(sessions, width=700, height=400):
 
         # Complexity growth: duration trend
         if len(d["durations"]) > 10:
-            first_half = np.mean(d["durations"][:len(d["durations"])//2])
-            second_half = np.mean(d["durations"][len(d["durations"])//2:])
+            first_half = np.mean(d["durations"][: len(d["durations"]) // 2])
+            second_half = np.mean(d["durations"][len(d["durations"]) // 2 :])
             if second_half > first_half * 1.5 and second_half > 10:
-                signals.append(f"Sessions getting longer ({first_half:.0f}→{second_half:.0f}min)")
+                signals.append(
+                    f"Sessions getting longer ({first_half:.0f}→{second_half:.0f}min)"
+                )
                 score += 15
 
         # Low edit efficiency: many sessions, few edits
@@ -2416,7 +2709,7 @@ def leverage_points(sessions, width=700, height=400):
 
         # Weight by total investment
         hours = d["total_dur"] / 60
-        score *= (1 + min(hours / 20, 2))  # projects with more time invested matter more
+        score *= 1 + min(hours / 20, 2)  # projects with more time invested matter more
 
         if signals:
             scored.append((repo, score, signals, d["sessions"], hours))
@@ -2424,7 +2717,12 @@ def leverage_points(sessions, width=700, height=400):
     scored.sort(key=lambda x: x[1], reverse=True)
     top = scored[:10]
     if not top:
-        return _svg(width, 60, f'<text x="{width/2}" y="35" text-anchor="middle" fill="{C["green"]}" font-size="12">No significant leverage points detected</text>', "")
+        return _svg(
+            width,
+            60,
+            f'<text x="{width / 2}" y="35" text-anchor="middle" fill="{C["green"]}" font-size="12">No significant leverage points detected</text>',
+            "",
+        )
 
     mx = top[0][1]
     m_left, m_top = 130, 40
@@ -2435,13 +2733,21 @@ def leverage_points(sessions, width=700, height=400):
     for i, (name, score, signals, n_sess, hours) in enumerate(top):
         y = m_top + i * row_h
         w = score / mx * pw * 0.5
-        urgency_color = C["rose"] if score > mx * 0.7 else C["amber"] if score > mx * 0.3 else C["cyan"]
+        urgency_color = (
+            C["rose"]
+            if score > mx * 0.7
+            else C["amber"]
+            if score > mx * 0.3
+            else C["cyan"]
+        )
 
-        bars += f'<rect x="{m_left}" y="{y+2:.0f}" width="{w:.0f}" height="{row_h*0.4:.0f}" rx="4" fill="{urgency_color}" opacity="0.7"/>'
-        bars += f'<text x="{m_left-6}" y="{y+row_h*0.3:.0f}" text-anchor="end" fill="{C["text"]}" font-size="9" font-weight="700">{name[:16]}</text>'
-        bars += f'<text x="{m_left}" y="{y+row_h*0.7:.0f}" fill="{C["text2"]}" font-size="8">{" · ".join(signals[:2])} — {n_sess} sessions, {hours:.0f}h invested</text>'
+        bars += f'<rect x="{m_left}" y="{y + 2:.0f}" width="{w:.0f}" height="{row_h * 0.4:.0f}" rx="4" fill="{urgency_color}" opacity="0.7"/>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h * 0.3:.0f}" text-anchor="end" fill="{C["text"]}" font-size="9" font-weight="700">{name[:16]}</text>'
+        bars += f'<text x="{m_left}" y="{y + row_h * 0.7:.0f}" fill="{C["text2"]}" font-size="8">{" · ".join(signals[:2])} — {n_sess} sessions, {hours:.0f}h invested</text>'
 
-    return _svg(width, height, bars, "Leverage Points (where practice/debt investment pays off)")
+    return _svg(
+        width, height, bars, "Leverage Points (where practice/debt investment pays off)"
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2466,22 +2772,28 @@ def efficiency_trend(sessions, width=600, height=200):
         return ""
 
     rates = [by_date[d][0] / max(by_date[d][1], 0.1) for d in dates]
-    smoothed = [np.mean(rates[max(0,i-4):i+1]) for i in range(len(rates))]
+    smoothed = [np.mean(rates[max(0, i - 4) : i + 1]) for i in range(len(rates))]
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(smoothed) or 1
 
-    points = " ".join(f"{m+i/max(len(smoothed)-1,1)*pw:.1f},{m+ph-v/mx*ph:.1f}" for i, v in enumerate(smoothed))
+    points = " ".join(
+        f"{m + i / max(len(smoothed) - 1, 1) * pw:.1f},{m + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(smoothed)
+    )
 
     delta = smoothed[-1] - smoothed[0]
     trend_word = "improving" if delta > 0 else "declining"
     trend_color = C["green"] if delta > 0 else C["rose"]
 
-    return _svg(width, height,
+    return _svg(
+        width,
+        height,
         f'<polyline points="{points}" fill="none" stroke="{trend_color}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m-4}" text-anchor="end" fill="{trend_color}" font-size="10" font-weight="700">{smoothed[-1]:.1f} edits/hr ({trend_word})</text>',
-        "Edit Efficiency (code changes per hour, 5-day rolling)")
+        f'<text x="{m + pw}" y="{m - 4}" text-anchor="end" fill="{trend_color}" font-size="10" font-weight="700">{smoothed[-1]:.1f} edits/hr ({trend_word})</text>',
+        "Edit Efficiency (code changes per hour, 5-day rolling)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2517,22 +2829,25 @@ def cumulative_human_days(sessions, width=600, height=220):
         cumulative.append(total)
 
     m = 45
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     mx = max(cumulative) or 1
 
     points = []
     for i, v in enumerate(cumulative):
-        x = m + i / max(len(cumulative)-1, 1) * pw
+        x = m + i / max(len(cumulative) - 1, 1) * pw
         y = m + ph - v / mx * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
-    return _svg(width, height,
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
+    return _svg(
+        width,
+        height,
         f'<defs><linearGradient id="chd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{C["green"]}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#chd)" opacity="0.3"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{C["green"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m+pw}" y="{m}" text-anchor="end" fill="{C["text"]}" font-size="14" font-weight="800">{total:.0f} dev-days</text>',
-        "Cumulative Human-Equivalent Output")
+        f'<text x="{m + pw}" y="{m}" text-anchor="end" fill="{C["text"]}" font-size="14" font-weight="800">{total:.0f} dev-days</text>',
+        "Cumulative Human-Equivalent Output",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2604,7 +2919,11 @@ def engineer_score(sessions, width=700, height=300):
         if n_proj <= 1:
             focus = 15
         else:
-            counts = list(Counter(s.get("repo", "?") for s in sessions if s.get("date") == d).values())
+            counts = list(
+                Counter(
+                    s.get("repo", "?") for s in sessions if s.get("date") == d
+                ).values()
+            )
             total_c = sum(counts)
             probs = [c / total_c for c in counts]
             ent = -sum(p * math.log2(p) for p in probs if p > 0)
@@ -2620,7 +2939,9 @@ def engineer_score(sessions, width=700, height=300):
         craft = min(rw / 0.5, 1) * 15  # 0.5 ratio = perfect score
 
         # Momentum (0-10)
-        if i > 0 and dates[i-1] == (datetime.strptime(d, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"):
+        if i > 0 and dates[i - 1] == (
+            datetime.strptime(d, "%Y-%m-%d") - timedelta(days=1)
+        ).strftime("%Y-%m-%d"):
             streak += 1
         else:
             streak = 0
@@ -2630,12 +2951,12 @@ def engineer_score(sessions, width=700, height=300):
         scores.append(min(total_score, 100))
 
     # 7-day moving average
-    ma7 = [np.mean(scores[max(0,i-6):i+1]) for i in range(len(scores))]
+    ma7 = [np.mean(scores[max(0, i - 6) : i + 1]) for i in range(len(scores))]
     # 30-day moving average
-    ma30 = [np.mean(scores[max(0,i-29):i+1]) for i in range(len(scores))]
+    ma30 = [np.mean(scores[max(0, i - 29) : i + 1]) for i in range(len(scores))]
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m - 40
+    pw, ph = width - 2 * m, height - 2 * m - 40
 
     # Daily score bars (faded)
     mx = 100
@@ -2645,48 +2966,73 @@ def engineer_score(sessions, width=700, height=300):
         h = v / mx * ph
         x = m + i * (bar_w + 1)
         y = m + 20 + ph - h
-        if v >= 70: color = C["green"]
-        elif v >= 40: color = C["amber"]
-        else: color = C["indigo"]
+        if v >= 70:
+            color = C["green"]
+        elif v >= 40:
+            color = C["amber"]
+        else:
+            color = C["indigo"]
         bars += f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" rx="1" fill="{color}" opacity="0.3"/>'
 
     # 7-day MA line
-    pts7 = " ".join(f"{m+i*(bar_w+1)+bar_w/2:.1f},{m+20+ph-v/mx*ph:.1f}" for i, v in enumerate(ma7))
+    pts7 = " ".join(
+        f"{m + i * (bar_w + 1) + bar_w / 2:.1f},{m + 20 + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(ma7)
+    )
     line7 = f'<polyline points="{pts7}" fill="none" stroke="{C["amber"]}" stroke-width="2.5" stroke-linejoin="round"/>'
 
     # 30-day MA line
-    pts30 = " ".join(f"{m+i*(bar_w+1)+bar_w/2:.1f},{m+20+ph-v/mx*ph:.1f}" for i, v in enumerate(ma30))
+    pts30 = " ".join(
+        f"{m + i * (bar_w + 1) + bar_w / 2:.1f},{m + 20 + ph - v / mx * ph:.1f}"
+        for i, v in enumerate(ma30)
+    )
     line30 = f'<polyline points="{pts30}" fill="none" stroke="{C["text"]}" stroke-width="2" stroke-linejoin="round" opacity="0.6"/>'
 
     # Grade thresholds
     ref_lines = ""
     for threshold, label, color in [(70, "A", C["green"]), (40, "B", C["amber"])]:
         y = m + 20 + ph - threshold / mx * ph
-        ref_lines += f'<line x1="{m}" y1="{y:.0f}" x2="{m+pw}" y2="{y:.0f}" stroke="{color}" stroke-dasharray="4 3" opacity="0.3"/>'
-        ref_lines += f'<text x="{m+pw+4}" y="{y+4:.0f}" fill="{color}" font-size="9" font-weight="700">{label}</text>'
+        ref_lines += f'<line x1="{m}" y1="{y:.0f}" x2="{m + pw}" y2="{y:.0f}" stroke="{color}" stroke-dasharray="4 3" opacity="0.3"/>'
+        ref_lines += f'<text x="{m + pw + 4}" y="{y + 4:.0f}" fill="{color}" font-size="9" font-weight="700">{label}</text>'
 
     current = ma7[-1]
-    grade = "A+" if current >= 85 else "A" if current >= 70 else "B+" if current >= 55 else "B" if current >= 40 else "C"
-    grade_color = C["green"] if current >= 70 else C["amber"] if current >= 40 else C["rose"]
+    grade = (
+        "A+"
+        if current >= 85
+        else "A"
+        if current >= 70
+        else "B+"
+        if current >= 55
+        else "B"
+        if current >= 40
+        else "C"
+    )
+    grade_color = (
+        C["green"] if current >= 70 else C["amber"] if current >= 40 else C["rose"]
+    )
 
     stats = (
-        f'<text x="{m}" y="{m+20+ph+20}" fill="{C["text2"]}" font-size="10">'
+        f'<text x="{m}" y="{m + 20 + ph + 20}" fill="{C["text2"]}" font-size="10">'
         f'Current: <tspan fill="{grade_color}" font-size="14" font-weight="800">{current:.0f} ({grade})</tspan> · '
         f'7d avg: <tspan fill="{C["amber"]}" font-weight="700">{ma7[-1]:.0f}</tspan> · '
         f'30d avg: <tspan fill="{C["text"]}" font-weight="700">{ma30[-1]:.0f}</tspan> · '
         f'Best: <tspan fill="{C["green"]}" font-weight="700">{max(scores):.0f}</tspan>'
-        f'</text>'
+        f"</text>"
     )
 
     legend = (
-        f'<line x1="{m+pw-170}" y1="{m+8}" x2="{m+pw-150}" y2="{m+8}" stroke="{C["amber"]}" stroke-width="2.5"/>'
-        f'<text x="{m+pw-146}" y="{m+12}" fill="{C["text2"]}" font-size="8">7d MA</text>'
-        f'<line x1="{m+pw-100}" y1="{m+8}" x2="{m+pw-80}" y2="{m+8}" stroke="{C["text"]}" stroke-width="2" opacity="0.6"/>'
-        f'<text x="{m+pw-76}" y="{m+12}" fill="{C["text2"]}" font-size="8">30d MA</text>'
+        f'<line x1="{m + pw - 170}" y1="{m + 8}" x2="{m + pw - 150}" y2="{m + 8}" stroke="{C["amber"]}" stroke-width="2.5"/>'
+        f'<text x="{m + pw - 146}" y="{m + 12}" fill="{C["text2"]}" font-size="8">7d MA</text>'
+        f'<line x1="{m + pw - 100}" y1="{m + 8}" x2="{m + pw - 80}" y2="{m + 8}" stroke="{C["text"]}" stroke-width="2" opacity="0.6"/>'
+        f'<text x="{m + pw - 76}" y="{m + 12}" fill="{C["text2"]}" font-size="8">30d MA</text>'
     )
 
-    return _svg(width, height, bars + ref_lines + line30 + line7 + stats + legend,
-        "Engineer Score (daily composite, 0-100)")
+    return _svg(
+        width,
+        height,
+        bars + ref_lines + line30 + line7 + stats + legend,
+        "Engineer Score (daily composite, 0-100)",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2707,9 +3053,20 @@ def developer_archetype(sessions, width=400, height=420):
     Automator: High subagent usage + high tool/message ratio
     Scholar: High token density + long sessions + few tool calls
     """
-    totals = {"edits": 0, "reads": 0, "bash": 0, "agent": 0, "mcp": 0,
-              "total_tools": 0, "sessions": 0, "tokens": 0, "duration": 0.0,
-              "msgs": 0, "repos": set(), "subagent_heavy": 0}
+    totals = {
+        "edits": 0,
+        "reads": 0,
+        "bash": 0,
+        "agent": 0,
+        "mcp": 0,
+        "total_tools": 0,
+        "sessions": 0,
+        "tokens": 0,
+        "duration": 0.0,
+        "msgs": 0,
+        "repos": set(),
+        "subagent_heavy": 0,
+    }
 
     for s in sessions:
         totals["sessions"] += 1
@@ -2741,9 +3098,15 @@ def developer_archetype(sessions, width=400, height=420):
     builder = min(totals["edits"] / tt * 3, 1)  # edit-heavy
     explorer = min(totals["reads"] / tt * 2, 1)  # read-heavy
     debugger = min(totals["bash"] / tt * 4, 1)  # bash-heavy
-    architect = min((totals["agent"] + totals["mcp"]) / tt * 5, 1) * min(len(totals["repos"]) / 30, 1)
-    automator = min(totals["subagent_heavy"] / n * 5, 1) * min(totals["total_tools"] / max(totals["msgs"], 1) / 5, 1)
-    scholar = min(totals["tokens"] / max(totals["duration"] * 60, 1) * 0.01, 1) * (1 - min(totals["total_tools"] / max(totals["msgs"], 1) / 10, 0.5))
+    architect = min((totals["agent"] + totals["mcp"]) / tt * 5, 1) * min(
+        len(totals["repos"]) / 30, 1
+    )
+    automator = min(totals["subagent_heavy"] / n * 5, 1) * min(
+        totals["total_tools"] / max(totals["msgs"], 1) / 5, 1
+    )
+    scholar = min(totals["tokens"] / max(totals["duration"] * 60, 1) * 0.01, 1) * (
+        1 - min(totals["total_tools"] / max(totals["msgs"], 1) / 10, 0.5)
+    )
 
     axes = [
         ("Builder", builder, C["indigo"]),
@@ -2766,7 +3129,9 @@ def developer_archetype(sessions, width=400, height=420):
         pts = []
         for i in range(n_axes):
             angle = 2 * math.pi * i / n_axes - math.pi / 2
-            pts.append(f"{cx + r * frac * math.cos(angle):.0f},{cy + r * frac * math.sin(angle):.0f}")
+            pts.append(
+                f"{cx + r * frac * math.cos(angle):.0f},{cy + r * frac * math.sin(angle):.0f}"
+            )
         grid += f'<polygon points="{" ".join(pts)}" fill="none" stroke="{C["border"]}" stroke-width="1"/>'
 
     # Data polygon
@@ -2794,7 +3159,9 @@ def developer_archetype(sessions, width=400, height=420):
     # Dominant label
     dom_label = f'<text x="{cx}" y="{cy + r + 55}" text-anchor="middle" fill="{dominant[2]}" font-size="16" font-weight="800">The {dominant[0]}</text>'
 
-    return _svg(width, height, grid + data_poly + labels + dom_label, "Developer Archetype")
+    return _svg(
+        width, height, grid + data_poly + labels + dom_label, "Developer Archetype"
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2829,36 +3196,45 @@ def cognitive_load(sessions, width=600, height=220):
         load = min((ctx * 0.4 + vol * 0.3 + density * 0.3) * 100, 100)
         loads.append(load)
 
-    smoothed = [np.mean(loads[max(0,i-2):i+1]) for i in range(len(loads))]
+    smoothed = [np.mean(loads[max(0, i - 2) : i + 1]) for i in range(len(loads))]
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
 
     # Color zones
     zones = ""
-    for threshold, color, label in [(80, C["rose"], "Overload"), (50, C["amber"], "High"), (25, C["green"], "Optimal")]:
+    for threshold, color, label in [
+        (80, C["rose"], "Overload"),
+        (50, C["amber"], "High"),
+        (25, C["green"], "Optimal"),
+    ]:
         y = m + ph - threshold / 100 * ph
-        zones += f'<line x1="{m}" y1="{y:.0f}" x2="{m+pw}" y2="{y:.0f}" stroke="{color}" stroke-dasharray="4 3" opacity="0.3"/>'
-        zones += f'<text x="{m+pw+4}" y="{y+4:.0f}" fill="{color}" font-size="8">{label}</text>'
+        zones += f'<line x1="{m}" y1="{y:.0f}" x2="{m + pw}" y2="{y:.0f}" stroke="{color}" stroke-dasharray="4 3" opacity="0.3"/>'
+        zones += f'<text x="{m + pw + 4}" y="{y + 4:.0f}" fill="{color}" font-size="8">{label}</text>'
 
     # Area fill
     points = []
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1, 1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         y = m + ph - v / 100 * ph
         points.append(f"{x:.1f},{y:.1f}")
 
-    fill_pts = f"{m},{m+ph} " + " ".join(points) + f" {m+pw},{m+ph}"
+    fill_pts = f"{m},{m + ph} " + " ".join(points) + f" {m + pw},{m + ph}"
     current = smoothed[-1]
-    load_color = C["rose"] if current > 70 else C["amber"] if current > 40 else C["green"]
+    load_color = (
+        C["rose"] if current > 70 else C["amber"] if current > 40 else C["green"]
+    )
 
-    return _svg(width, height,
-        zones +
-        f'<defs><linearGradient id="clg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{load_color}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
+    return _svg(
+        width,
+        height,
+        zones
+        + f'<defs><linearGradient id="clg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{load_color}"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>'
         f'<polygon points="{fill_pts}" fill="url(#clg)" opacity="0.25"/>'
         f'<polyline points="{" ".join(points)}" fill="none" stroke="{load_color}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m}" y="{m-4}" fill="{load_color}" font-size="12" font-weight="800">Cognitive Load: {current:.0f}/100</text>',
-        "")
+        f'<text x="{m}" y="{m - 4}" fill="{load_color}" font-size="12" font-weight="800">Cognitive Load: {current:.0f}/100</text>',
+        "",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2889,7 +3265,7 @@ def decision_fatigue(sessions, width=500, height=220):
 
     mx = max(ratios.values()) or 1
     m = 50
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     bar_w = pw / 24 - 2
 
     bars = ""
@@ -2899,10 +3275,15 @@ def decision_fatigue(sessions, width=500, height=220):
         x = m + h * (bar_w + 2)
         y = m + ph - bh
         # Green = decisive, red = fatigued
-        color = C["green"] if v > mx * 0.6 else C["amber"] if v > mx * 0.3 else C["rose"]
+        color = (
+            C["green"] if v > mx * 0.6 else C["amber"] if v > mx * 0.3 else C["rose"]
+        )
         bars += f'<rect x="{x:.0f}" y="{y:.0f}" width="{bar_w:.0f}" height="{bh:.0f}" rx="2" fill="{color}" opacity="0.7"/>'
 
-    labels = "".join(f'<text x="{m + h*(bar_w+2) + bar_w/2:.0f}" y="{m+ph+13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>' for h in range(0, 24, 3))
+    labels = "".join(
+        f'<text x="{m + h * (bar_w + 2) + bar_w / 2:.0f}" y="{m + ph + 13}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{h:02d}</text>'
+        for h in range(0, 24, 3)
+    )
 
     # Find fatigue pattern
     morning = np.mean([ratios.get(h, 0) for h in range(8, 12)])
@@ -2917,9 +3298,14 @@ def decision_fatigue(sessions, width=500, height=220):
         insight = "Consistent decision-making throughout the day"
         ins_color = C["amber"]
 
-    return _svg(width, height, bars + labels +
-        f'<text x="{m}" y="{m-6}" fill="{ins_color}" font-size="10" font-weight="700">{insight}</text>',
-        "Decision Fatigue (edit/read ratio by hour)")
+    return _svg(
+        width,
+        height,
+        bars
+        + labels
+        + f'<text x="{m}" y="{m - 6}" fill="{ins_color}" font-size="10" font-weight="700">{insight}</text>',
+        "Decision Fatigue (edit/read ratio by hour)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -2946,10 +3332,10 @@ def creative_analytical(sessions, width=600, height=220):
         return ""
 
     ratios = [by_date[d][0] / max(by_date[d][1], 1) for d in dates]
-    smoothed = [np.mean(ratios[max(0,i-2):i+1]) for i in range(len(ratios))]
+    smoothed = [np.mean(ratios[max(0, i - 2) : i + 1]) for i in range(len(ratios))]
 
     m = 50
-    pw, ph = width - 2*m, height - 2*m
+    pw, ph = width - 2 * m, height - 2 * m
     # Center line at ratio=1.0 (balance)
     mx = max(max(smoothed), 2)
 
@@ -2958,9 +3344,13 @@ def creative_analytical(sessions, width=600, height=220):
     points_bot = []
     center_y = m + ph / 2
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1, 1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         # Map ratio to position: 1.0 = center, >1 = above (creative), <1 = below (analytical)
-        y = center_y - (v - 1) / (mx - 1) * (ph / 2) if v >= 1 else center_y + (1 - v) / 1 * (ph / 2)
+        y = (
+            center_y - (v - 1) / (mx - 1) * (ph / 2)
+            if v >= 1
+            else center_y + (1 - v) / 1 * (ph / 2)
+        )
         y = max(m, min(m + ph, y))
         if v >= 1:
             points_top.append(f"{x:.1f},{y:.1f}")
@@ -2970,20 +3360,23 @@ def creative_analytical(sessions, width=600, height=220):
     # Full line
     all_pts = []
     for i, v in enumerate(smoothed):
-        x = m + i / max(len(smoothed)-1, 1) * pw
+        x = m + i / max(len(smoothed) - 1, 1) * pw
         y = center_y - (v - 1) / max(mx - 1, 0.1) * (ph / 2)
         y = max(m, min(m + ph, y))
         all_pts.append(f"{x:.1f},{y:.1f}")
 
     creative_pct = sum(1 for r in ratios if r > 1) / len(ratios) * 100
 
-    return _svg(width, height,
-        f'<line x1="{m}" y1="{center_y}" x2="{m+pw}" y2="{center_y}" stroke="{C["border"]}" stroke-width="1"/>'
-        f'<text x="{m+pw+4}" y="{m+10}" fill="{C["indigo"]}" font-size="9">Creative</text>'
-        f'<text x="{m+pw+4}" y="{m+ph-4}" fill="{C["cyan"]}" font-size="9">Analytical</text>'
+    return _svg(
+        width,
+        height,
+        f'<line x1="{m}" y1="{center_y}" x2="{m + pw}" y2="{center_y}" stroke="{C["border"]}" stroke-width="1"/>'
+        f'<text x="{m + pw + 4}" y="{m + 10}" fill="{C["indigo"]}" font-size="9">Creative</text>'
+        f'<text x="{m + pw + 4}" y="{m + ph - 4}" fill="{C["cyan"]}" font-size="9">Analytical</text>'
         f'<polyline points="{" ".join(all_pts)}" fill="none" stroke="{C["indigo"]}" stroke-width="2.5" stroke-linejoin="round"/>'
-        f'<text x="{m}" y="{m-6}" fill="{C["text"]}" font-size="10" font-weight="700">{creative_pct:.0f}% creative days · {100-creative_pct:.0f}% analytical days</text>',
-        "Creative vs Analytical Mode (edit/read ratio, 1.0 = balanced)")
+        f'<text x="{m}" y="{m - 6}" fill="{C["text"]}" font-size="10" font-weight="700">{creative_pct:.0f}% creative days · {100 - creative_pct:.0f}% analytical days</text>',
+        "Creative vs Analytical Mode (edit/read ratio, 1.0 = balanced)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -3023,8 +3416,12 @@ def prowess_pentagon(sessions, width=400, height=400):
 
     # Score each axis 0-1
     craft = min(total_edits / max(total_reads, 1) / 0.5, 1)  # 0.5 ratio = perfect
-    velocity = min(total_tokens / max(total_hours, 1) / 15000, 1)  # 15k tok/hr = perfect
-    depth = min(np.mean(meaningful_durations) / 60, 1) if meaningful_durations else 0  # 60min avg = perfect
+    velocity = min(
+        total_tokens / max(total_hours, 1) / 15000, 1
+    )  # 15k tok/hr = perfect
+    depth = (
+        min(np.mean(meaningful_durations) / 60, 1) if meaningful_durations else 0
+    )  # 60min avg = perfect
     breadth = min(len(repos) / 50, 1)  # 50 repos = perfect
     delegation = min(total_agent / max(total_tools, 1) / 0.1, 1)  # 10% agent = perfect
 
@@ -3037,16 +3434,23 @@ def prowess_pentagon(sessions, width=400, height=400):
     ]
 
     def grade(v):
-        if v >= 0.9: return "A+"
-        if v >= 0.75: return "A"
-        if v >= 0.6: return "B+"
-        if v >= 0.45: return "B"
-        if v >= 0.3: return "C+"
+        if v >= 0.9:
+            return "A+"
+        if v >= 0.75:
+            return "A"
+        if v >= 0.6:
+            return "B+"
+        if v >= 0.45:
+            return "B"
+        if v >= 0.3:
+            return "C+"
         return "C"
 
     def grade_color(v):
-        if v >= 0.75: return C["green"]
-        if v >= 0.45: return C["amber"]
+        if v >= 0.75:
+            return C["green"]
+        if v >= 0.45:
+            return C["amber"]
         return C["rose"]
 
     cx, cy, r = width / 2, 180, 110
@@ -3058,7 +3462,9 @@ def prowess_pentagon(sessions, width=400, height=400):
         pts = []
         for i in range(n_axes):
             angle = 2 * math.pi * i / n_axes - math.pi / 2
-            pts.append(f"{cx + r * frac * math.cos(angle):.0f},{cy + r * frac * math.sin(angle):.0f}")
+            pts.append(
+                f"{cx + r * frac * math.cos(angle):.0f},{cy + r * frac * math.sin(angle):.0f}"
+            )
         grid += f'<polygon points="{" ".join(pts)}" fill="none" stroke="{C["border"]}" stroke-width="1"/>'
 
     # Data polygon
@@ -3088,10 +3494,16 @@ def prowess_pentagon(sessions, width=400, height=400):
     overall_grade = grade(overall)
     overall_color = grade_color(overall)
 
-    return _svg(width, height, grid + data_poly + labels +
-        f'<text x="{cx}" y="{cy + r + 60}" text-anchor="middle" fill="{overall_color}" font-size="20" font-weight="900">Overall: {overall_grade}</text>'
+    return _svg(
+        width,
+        height,
+        grid
+        + data_poly
+        + labels
+        + f'<text x="{cx}" y="{cy + r + 60}" text-anchor="middle" fill="{overall_color}" font-size="20" font-weight="900">Overall: {overall_grade}</text>'
         f'<text x="{cx}" y="{cy + r + 76}" text-anchor="middle" fill="{C["text2"]}" font-size="10">{overall:.0%} composite prowess</text>',
-        "Prowess Pentagon")
+        "Prowess Pentagon",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -3109,10 +3521,18 @@ def teaching_insights(sessions, width=650, height=500):
         hour_tokens[h] += s.get("output_tokens", 0)
         hour_sessions[h] += 1
     if hour_tokens:
-        best_h = max(hour_tokens, key=lambda h: hour_tokens[h] / max(hour_sessions[h], 1))
-        worst_h = min(hour_tokens, key=lambda h: hour_tokens[h] / max(hour_sessions[h], 1))
-        ratio = (hour_tokens[best_h] / max(hour_sessions[best_h], 1)) / max(hour_tokens[worst_h] / max(hour_sessions[worst_h], 1), 1)
-        insights.append(f"Your peak hour is {best_h:02d}:00 — you produce {ratio:.1f}x more output than at {worst_h:02d}:00")
+        best_h = max(
+            hour_tokens, key=lambda h: hour_tokens[h] / max(hour_sessions[h], 1)
+        )
+        worst_h = min(
+            hour_tokens, key=lambda h: hour_tokens[h] / max(hour_sessions[h], 1)
+        )
+        ratio = (hour_tokens[best_h] / max(hour_sessions[best_h], 1)) / max(
+            hour_tokens[worst_h] / max(hour_sessions[worst_h], 1), 1
+        )
+        insights.append(
+            f"Your peak hour is {best_h:02d}:00 — you produce {ratio:.1f}x more output than at {worst_h:02d}:00"
+        )
 
     # Best day
     day_tokens = defaultdict(list)
@@ -3122,26 +3542,46 @@ def teaching_insights(sessions, width=650, height=500):
         best_day = max(day_tokens, key=lambda d: np.mean(day_tokens[d]))
         worst_day = min(day_tokens, key=lambda d: np.mean(day_tokens[d]))
         if best_day != worst_day:
-            ratio = np.mean(day_tokens[best_day]) / max(np.mean(day_tokens[worst_day]), 1)
-            insights.append(f"{best_day}s are your power day — {ratio:.1f}x more productive than {worst_day}s")
+            ratio = np.mean(day_tokens[best_day]) / max(
+                np.mean(day_tokens[worst_day]), 1
+            )
+            insights.append(
+                f"{best_day}s are your power day — {ratio:.1f}x more productive than {worst_day}s"
+            )
 
     # Session length sweet spot
     dur_tokens = defaultdict(list)
     for s in sessions:
         d = s.get("duration_mins", 0)
         if d > 1:
-            bucket = "< 10min" if d < 10 else "10-30min" if d < 30 else "30-60min" if d < 60 else "1-2hrs" if d < 120 else "2hrs+"
+            bucket = (
+                "< 10min"
+                if d < 10
+                else "10-30min"
+                if d < 30
+                else "30-60min"
+                if d < 60
+                else "1-2hrs"
+                if d < 120
+                else "2hrs+"
+            )
             t = s.get("output_tokens", 0) / max(d, 1)
             dur_tokens[bucket].append(t)
     if dur_tokens:
         best_bucket = max(dur_tokens, key=lambda b: np.mean(dur_tokens[b]))
-        insights.append(f"Your sweet spot is {best_bucket} sessions — highest tokens per minute")
+        insights.append(
+            f"Your sweet spot is {best_bucket} sessions — highest tokens per minute"
+        )
 
     # Delegation insight
-    agent_sessions = sum(1 for s in sessions if s.get("tool_uses", {}).get("Agent", 0) > 0)
+    agent_sessions = sum(
+        1 for s in sessions if s.get("tool_uses", {}).get("Agent", 0) > 0
+    )
     total = len(sessions) or 1
     if agent_sessions > 0:
-        insights.append(f"You delegate to subagents in {agent_sessions/total*100:.0f}% of sessions — that's your force multiplier")
+        insights.append(
+            f"You delegate to subagents in {agent_sessions / total * 100:.0f}% of sessions — that's your force multiplier"
+        )
 
     # Rework pattern
     by_date_repo = defaultdict(list)
@@ -3158,24 +3598,40 @@ def teaching_insights(sessions, width=650, height=500):
                 break
             seen.add(r)
     if total_days > 0:
-        insights.append(f"You revisit the same repo multiple times in {revisits/total_days*100:.0f}% of days — potential rework signal")
+        insights.append(
+            f"You revisit the same repo multiple times in {revisits / total_days * 100:.0f}% of days — potential rework signal"
+        )
 
     # Weekend warrior
     we_sessions = sum(1 for s in sessions if s.get("weekday_num", 0) >= 5)
     if we_sessions > 0:
-        insights.append(f"You've coded {we_sessions} sessions on weekends — {we_sessions/total*100:.0f}% of all work")
+        insights.append(
+            f"You've coded {we_sessions} sessions on weekends — {we_sessions / total * 100:.0f}% of all work"
+        )
 
     # Growing or shrinking sessions
     dates = sorted(set(s.get("date", "") for s in sessions))
     if len(dates) > 14:
-        first_week = [s.get("duration_mins", 0) for s in sessions if s.get("date", "") in dates[:7]]
-        last_week = [s.get("duration_mins", 0) for s in sessions if s.get("date", "") in dates[-7:]]
+        first_week = [
+            s.get("duration_mins", 0)
+            for s in sessions
+            if s.get("date", "") in dates[:7]
+        ]
+        last_week = [
+            s.get("duration_mins", 0)
+            for s in sessions
+            if s.get("date", "") in dates[-7:]
+        ]
         if first_week and last_week:
             growth = np.mean(last_week) / max(np.mean(first_week), 1)
             if growth > 1.3:
-                insights.append(f"Sessions are {growth:.1f}x longer now than when you started — you're going deeper")
+                insights.append(
+                    f"Sessions are {growth:.1f}x longer now than when you started — you're going deeper"
+                )
             elif growth < 0.7:
-                insights.append(f"Sessions are {1/growth:.1f}x shorter now — you're getting faster or more fragmented")
+                insights.append(
+                    f"Sessions are {1 / growth:.1f}x shorter now — you're getting faster or more fragmented"
+                )
 
     m = 15
     y = 35
@@ -3183,9 +3639,9 @@ def teaching_insights(sessions, width=650, height=500):
     for i, insight in enumerate(insights[:8]):
         card_h = 45
         accent = PALETTE[i % len(PALETTE)]
-        cards += f'<rect x="{m}" y="{y}" width="{width-2*m}" height="{card_h}" rx="8" fill="{C["surface"]}" stroke="{C["border"]}" stroke-width="1"/>'
+        cards += f'<rect x="{m}" y="{y}" width="{width - 2 * m}" height="{card_h}" rx="8" fill="{C["surface"]}" stroke="{C["border"]}" stroke-width="1"/>'
         cards += f'<rect x="{m}" y="{y}" width="4" height="{card_h}" rx="2" fill="{accent}"/>'
-        cards += f'<text x="{m+16}" y="{y+28}" fill="{C["text"]}" font-size="11">{insight}</text>'
+        cards += f'<text x="{m + 16}" y="{y + 28}" fill="{C["text"]}" font-size="11">{insight}</text>'
         y += card_h + 8
 
     return _svg(width, min(y + 10, 600), cards, "What Your Data Reveals About You")
@@ -3208,10 +3664,17 @@ def growth_trajectory(sessions, width=600, height=300):
 
     def metrics(sess):
         n = len(sess) or 1
-        total_edits = sum(s.get("tool_uses", {}).get("Edit", 0) + s.get("tool_uses", {}).get("Write", 0) for s in sess if isinstance(s.get("tool_uses"), dict))
+        total_edits = sum(
+            s.get("tool_uses", {}).get("Edit", 0)
+            + s.get("tool_uses", {}).get("Write", 0)
+            for s in sess
+            if isinstance(s.get("tool_uses"), dict)
+        )
         total_tokens = sum(s.get("output_tokens", 0) for s in sess)
         total_hours = sum(s.get("duration_mins", 0) for s in sess) / 60
-        avg_dur = np.mean([s.get("duration_mins", 0) for s in sess if s.get("duration_mins", 0) > 1])
+        avg_dur = np.mean(
+            [s.get("duration_mins", 0) for s in sess if s.get("duration_mins", 0) > 1]
+        )
         repos = len(set(s.get("repo", "?") for s in sess))
         return {
             "Sessions/day": n / 14,
@@ -3237,24 +3700,24 @@ def growth_trajectory(sessions, width=600, height=300):
         ew = ev / mx * pw * 0.4
         lw = lv / mx * pw * 0.4
 
-        bars += f'<text x="{m_left-6}" y="{y+row_h/2+4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="10">{key}</text>'
+        bars += f'<text x="{m_left - 6}" y="{y + row_h / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="10">{key}</text>'
         # Early bar
-        bars += f'<rect x="{m_left}" y="{y+4:.0f}" width="{ew:.0f}" height="{row_h*0.35:.0f}" rx="3" fill="{C["cyan"]}" opacity="0.6"/>'
+        bars += f'<rect x="{m_left}" y="{y + 4:.0f}" width="{ew:.0f}" height="{row_h * 0.35:.0f}" rx="3" fill="{C["cyan"]}" opacity="0.6"/>'
         # Late bar
-        bars += f'<rect x="{m_left}" y="{y+row_h*0.45:.0f}" width="{lw:.0f}" height="{row_h*0.35:.0f}" rx="3" fill="{C["green"]}" opacity="0.6"/>'
+        bars += f'<rect x="{m_left}" y="{y + row_h * 0.45:.0f}" width="{lw:.0f}" height="{row_h * 0.35:.0f}" rx="3" fill="{C["green"]}" opacity="0.6"/>'
 
         # Change indicator
         if ev > 0:
             change = (lv - ev) / ev * 100
             ch_color = C["green"] if change > 0 else C["rose"]
             arrow = "+" if change > 0 else ""
-            bars += f'<text x="{m_left+pw*0.4+10}" y="{y+row_h/2+4:.0f}" fill="{ch_color}" font-size="11" font-weight="800">{arrow}{change:.0f}%</text>'
+            bars += f'<text x="{m_left + pw * 0.4 + 10}" y="{y + row_h / 2 + 4:.0f}" fill="{ch_color}" font-size="11" font-weight="800">{arrow}{change:.0f}%</text>'
 
     legend = (
-        f'<rect x="{m_left}" y="{m_top-18}" width="8" height="8" rx="2" fill="{C["cyan"]}"/>'
-        f'<text x="{m_left+12}" y="{m_top-10}" fill="{C["text2"]}" font-size="9">First 2 weeks</text>'
-        f'<rect x="{m_left+110}" y="{m_top-18}" width="8" height="8" rx="2" fill="{C["green"]}"/>'
-        f'<text x="{m_left+122}" y="{m_top-10}" fill="{C["text2"]}" font-size="9">Last 2 weeks</text>'
+        f'<rect x="{m_left}" y="{m_top - 18}" width="8" height="8" rx="2" fill="{C["cyan"]}"/>'
+        f'<text x="{m_left + 12}" y="{m_top - 10}" fill="{C["text2"]}" font-size="9">First 2 weeks</text>'
+        f'<rect x="{m_left + 110}" y="{m_top - 18}" width="8" height="8" rx="2" fill="{C["green"]}"/>'
+        f'<text x="{m_left + 122}" y="{m_top - 10}" fill="{C["text2"]}" font-size="9">Last 2 weeks</text>'
     )
 
     return _svg(width, height, bars + legend, "Growth Trajectory")
@@ -3317,38 +3780,49 @@ def faang_level(sessions, width=700, height=340):
         tok_hr = day_tokens[d] / hrs
 
         # Score each dimension 0-1
-        scope = min(repos / 6, 1.0)                    # 6+ repos = max
-        delegation = min(agent_rate / 0.5, 1.0)         # 50%+ = max
-        velocity = min(edits_hr / 40, 1.0)              # 40 edits/hr = max
-        depth = min(avg_dur / 90, 1.0)                   # 90min avg = max
-        sophistication = min(tool_variety / 15, 1.0)     # 15+ tools = max
-        throughput = min(tok_hr / 30000, 1.0)            # 30k tok/hr = max
+        scope = min(repos / 6, 1.0)  # 6+ repos = max
+        delegation = min(agent_rate / 0.5, 1.0)  # 50%+ = max
+        velocity = min(edits_hr / 40, 1.0)  # 40 edits/hr = max
+        depth = min(avg_dur / 90, 1.0)  # 90min avg = max
+        sophistication = min(tool_variety / 15, 1.0)  # 15+ tools = max
+        throughput = min(tok_hr / 30000, 1.0)  # 30k tok/hr = max
 
         # Weighted composite → 3.0 to 8.0
         composite = (
-            scope * 0.20 +
-            delegation * 0.18 +
-            velocity * 0.18 +
-            depth * 0.15 +
-            sophistication * 0.14 +
-            throughput * 0.15
+            scope * 0.20
+            + delegation * 0.18
+            + velocity * 0.18
+            + depth * 0.15
+            + sophistication * 0.14
+            + throughput * 0.15
         )
         level = 3.0 + composite * 5.0  # maps 0→L3, 1→L8
         daily_levels.append(level)
 
     # Moving averages
-    ma7 = [float(np.mean(daily_levels[max(0, i-6):i+1])) for i in range(len(daily_levels))]
-    ma30 = [float(np.mean(daily_levels[max(0, i-29):i+1])) for i in range(len(daily_levels))]
+    ma7 = [
+        float(np.mean(daily_levels[max(0, i - 6) : i + 1]))
+        for i in range(len(daily_levels))
+    ]
+    ma30 = [
+        float(np.mean(daily_levels[max(0, i - 29) : i + 1]))
+        for i in range(len(daily_levels))
+    ]
 
     # Current level (30d avg)
     current = ma30[-1]
     level_name = (
-        "L3 (Junior)" if current < 3.8 else
-        "L4 (Mid-Level)" if current < 4.6 else
-        "L5 (Senior)" if current < 5.4 else
-        "L6 (Staff)" if current < 6.2 else
-        "L7 (Principal)" if current < 7.0 else
-        "L8 (Distinguished)"
+        "L3 (Junior)"
+        if current < 3.8
+        else "L4 (Mid-Level)"
+        if current < 4.6
+        else "L5 (Senior)"
+        if current < 5.4
+        else "L6 (Staff)"
+        if current < 6.2
+        else "L7 (Principal)"
+        if current < 7.0
+        else "L8 (Distinguished)"
     )
 
     m = 55
@@ -3359,8 +3833,12 @@ def faang_level(sessions, width=700, height=340):
     # Level zone backgrounds
     zones = ""
     level_labels = [
-        (3.0, "L3"), (4.0, "L4"), (5.0, "L5"),
-        (6.0, "L6"), (7.0, "L7"), (8.0, "L8")
+        (3.0, "L3"),
+        (4.0, "L4"),
+        (5.0, "L5"),
+        (6.0, "L6"),
+        (7.0, "L7"),
+        (8.0, "L8"),
     ]
     zone_colors = ["#22c55e20", "#06b6d420", "#6366f120", "#a855f720", "#f59e0b20"]
     for i in range(5):
@@ -3369,7 +3847,7 @@ def faang_level(sessions, width=700, height=340):
         y_top = m + ph - (high - y_min) / y_range * ph
         y_bot = m + ph - (low - y_min) / y_range * ph
         zones += f'<rect x="{m}" y="{y_top:.0f}" width="{pw}" height="{y_bot - y_top:.0f}" fill="{zone_colors[i]}"/>'
-        zones += f'<text x="{m-4}" y="{(y_top + y_bot) / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9" font-weight="700">{level_labels[i][1]}</text>'
+        zones += f'<text x="{m - 4}" y="{(y_top + y_bot) / 2 + 4:.0f}" text-anchor="end" fill="{C["text2"]}" font-size="9" font-weight="700">{level_labels[i][1]}</text>'
 
     # Daily bars (thin candlestick-style)
     bars = ""
@@ -3418,8 +3896,12 @@ def faang_level(sessions, width=700, height=340):
         x = m + i / max(n - 1, 1) * pw
         date_labels += f'<text x="{x:.0f}" y="{m + ph + 12}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{dates[i][5:]}</text>'
 
-    return _svg(width, height, zones + bars + ma7_line + ma30_line + callout + legend + date_labels,
-        "FAANG Level Estimation (L3-L8)")
+    return _svg(
+        width,
+        height,
+        zones + bars + ma7_line + ma30_line + callout + legend + date_labels,
+        "FAANG Level Estimation (L3-L8)",
+    )
 
 
 # -----------------------------------------------------------------------
@@ -3501,24 +3983,24 @@ def architecture_score(sessions, width=700, height=340):
             design = 0.5
 
         score = (
-            research * 25 +
-            planning * 20 +
-            focus * 10 +
-            depth * 15 +
-            deleg * 15 +
-            design * 15
+            research * 25
+            + planning * 20
+            + focus * 10
+            + depth * 15
+            + deleg * 15
+            + design * 15
         )
         daily_scores.append(min(score, 100))
 
     n = len(daily_scores)
-    ma7 = [float(np.mean(daily_scores[max(0, i-6):i+1])) for i in range(n)]
-    ma30 = [float(np.mean(daily_scores[max(0, i-29):i+1])) for i in range(n)]
+    ma7 = [float(np.mean(daily_scores[max(0, i - 6) : i + 1])) for i in range(n)]
+    ma30 = [float(np.mean(daily_scores[max(0, i - 29) : i + 1])) for i in range(n)]
 
     # Bollinger bands (20d, 2 std)
     upper_band: list[float] = []
     lower_band: list[float] = []
     for i in range(n):
-        window = daily_scores[max(0, i-19):i+1]
+        window = daily_scores[max(0, i - 19) : i + 1]
         avg = float(np.mean(window))
         std = float(np.std(window)) if len(window) > 1 else 0
         upper_band.append(min(avg + 2 * std, 100))
@@ -3550,7 +4032,9 @@ def architecture_score(sessions, width=700, height=340):
         band_pts_up.append(f"{x:.1f},{y_up:.1f}")
         band_pts_down.append(f"{x:.1f},{y_down:.1f}")
     band_polygon = " ".join(band_pts_up) + " " + " ".join(reversed(band_pts_down))
-    band_fill = f'<polygon points="{band_polygon}" fill="{C["indigo"]}" opacity="0.08"/>'
+    band_fill = (
+        f'<polygon points="{band_polygon}" fill="{C["indigo"]}" opacity="0.08"/>'
+    )
 
     # Daily candlestick bars
     bars = ""
@@ -3578,7 +4062,15 @@ def architecture_score(sessions, width=700, height=340):
 
     # Current score callout
     current = ma30[-1]
-    grade = "Visionary" if current >= 75 else "Mature" if current >= 50 else "Emerging" if current >= 25 else "Tactical"
+    grade = (
+        "Visionary"
+        if current >= 75
+        else "Mature"
+        if current >= 50
+        else "Emerging"
+        if current >= 25
+        else "Tactical"
+    )
     cy = m + ph - current / 100 * ph
     callout = (
         f'<circle cx="{m + pw}" cy="{cy:.0f}" r="4" fill="{C["amber"]}"/>'
@@ -3607,5 +4099,16 @@ def architecture_score(sessions, width=700, height=340):
         x = m + i / max(n - 1, 1) * pw
         date_labels += f'<text x="{x:.0f}" y="{m + ph + 12}" text-anchor="middle" fill="{C["text2"]}" font-size="8">{dates[i][5:]}</text>'
 
-    return _svg(width, height, zones + band_fill + bars + ma7_line + ma30_line + callout + legend + date_labels,
-        "Architecture Score (Bollinger Bands)")
+    return _svg(
+        width,
+        height,
+        zones
+        + band_fill
+        + bars
+        + ma7_line
+        + ma30_line
+        + callout
+        + legend
+        + date_labels,
+        "Architecture Score (Bollinger Bands)",
+    )

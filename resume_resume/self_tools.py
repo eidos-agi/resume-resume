@@ -28,6 +28,7 @@ from .session_utils import filter_automated as _filter_automated
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _wrap(items: list) -> dict:
     """Wrap a list in {items, count} for uniform MCP response shape."""
     return {"items": items, "count": len(items)}
@@ -44,6 +45,7 @@ _SELF_INSIGHTS_CACHE_TTL = 15.0
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
+
 
 def register_self_tools(mcp_instance):
     """Register all self_* tools on the MCP server."""
@@ -64,7 +66,11 @@ def register_self_tools(mcp_instance):
         now = time.time()
         cached = _SELF_INSIGHTS_CACHE.get(days)
         if cached and (now - cached["ts"]) < _SELF_INSIGHTS_CACHE_TTL:
-            return {**cached["data"], "cached": True, "cache_age_s": round(now - cached["ts"], 1)}
+            return {
+                **cached["data"],
+                "cached": True,
+                "cache_age_s": round(now - cached["ts"], 1),
+            }
 
         data = _tq.insights_report(days=days)
         data["cached"] = False
@@ -133,8 +139,13 @@ def register_self_tools(mcp_instance):
         action_class: "auto" | "queued"
         """
         return _meta.file_a1_recommendation(
-            type=type, title=title, evidence=evidence, confidence=confidence,
-            action_class=action_class, target=target, new_value=new_value,
+            type=type,
+            title=title,
+            evidence=evidence,
+            confidence=confidence,
+            action_class=action_class,
+            target=target,
+            new_value=new_value,
             suggested_action=suggested_action,
         )
 
@@ -157,8 +168,12 @@ def register_self_tools(mcp_instance):
               -> {"key": "...", "from": X, "to": Y}; else descriptive string.
         """
         return _meta.file_a2_proposal(
-            target=target, change_type=change_type, title=title,
-            evidence=evidence, confidence=confidence, diff=diff,
+            target=target,
+            change_type=change_type,
+            title=title,
+            evidence=evidence,
+            confidence=confidence,
+            diff=diff,
             expected_effect=expected_effect,
         )
 
@@ -193,7 +208,11 @@ def register_self_tools(mcp_instance):
     @mcp_instance.tool()
     def self_a1_output(limit: int = 20, action_class: str = "") -> dict:
         """Recent A1 recommendations. Optional filter by action_class: 'auto' or 'queued'."""
-        return _wrap(_meta.a1_recent_recommendations(limit=limit, action_class=action_class or None))
+        return _wrap(
+            _meta.a1_recent_recommendations(
+                limit=limit, action_class=action_class or None
+            )
+        )
 
     @mcp_instance.tool()
     def self_a1_auto_applied(limit: int = 50) -> dict:
@@ -220,7 +239,9 @@ def register_self_tools(mcp_instance):
     # --- Session health ranking ---
 
     @mcp_instance.tool()
-    def healthy_sessions(hours: int = 168, limit: int = 10, min_health: int = 30) -> dict:
+    def healthy_sessions(
+        hours: int = 168, limit: int = 10, min_health: int = 30
+    ) -> dict:
         """Sessions ranked by value density, not just recency.
 
         Health score (0-100) combines: session duration, file size (message
@@ -236,7 +257,11 @@ def register_self_tools(mcp_instance):
           limit: Max results (default 10).
           min_health: Minimum health score to include (default 30).
         """
-        from .mcp_server import _find_all_sessions_cached, _get_cache_index, _session_row
+        from .mcp_server import (
+            _find_all_sessions_cached,
+            _get_cache_index,
+            _session_row,
+        )
 
         all_sessions = _find_all_sessions_cached()
         cutoff = time.time() - hours * 3600
@@ -244,10 +269,12 @@ def register_self_tools(mcp_instance):
         # Filter by time + automated
         cache_index = _get_cache_index()
         sessions = [
-            s for s in all_sessions
+            s
+            for s in all_sessions
             if s["mtime"] >= cutoff
             and s.get("project_dir", "") != str(Path.home())
-            and cache_index.get(s["session_id"], {}).get("classification") != "automated"
+            and cache_index.get(s["session_id"], {}).get("classification")
+            != "automated"
         ]
 
         # Build rows with health scores
@@ -272,8 +299,12 @@ def register_self_tools(mcp_instance):
         the human decide.
         """
         from .mcp_server import (
-            _find_all_sessions_cached, _get_cache_index, _session_health,
-            shorten_path, _DIRTY_REPOS_CACHE, _DIRTY_REPOS_CACHE_TTL,
+            _find_all_sessions_cached,
+            _get_cache_index,
+            _session_health,
+            shorten_path,
+            _DIRTY_REPOS_CACHE,
+            _DIRTY_REPOS_CACHE_TTL,
         )
         import json as _json
 
@@ -287,7 +318,10 @@ def register_self_tools(mcp_instance):
         #    Avoids 20 × _scan_repo_git subprocess calls per suggest_next.
         now = time.time()
         cached_dirty = _DIRTY_REPOS_CACHE.get("data")
-        if cached_dirty and (now - _DIRTY_REPOS_CACHE.get("ts", 0)) < _DIRTY_REPOS_CACHE_TTL:
+        if (
+            cached_dirty
+            and (now - _DIRTY_REPOS_CACHE.get("ts", 0)) < _DIRTY_REPOS_CACHE_TTL
+        ):
             dirty_list = cached_dirty.get("dirty", [])
         else:
             # No cached data — skip dirty repo suggestions this call.
@@ -298,12 +332,14 @@ def register_self_tools(mcp_instance):
             count = d.get("dirty_file_count", len(d.get("dirty_files", [])))
             proj = d.get("path", "")
             if proj:
-                suggestions.append({
-                    "project": proj,
-                    "action": "commit",
-                    "reason": f"{count} uncommitted files",
-                    "priority": min(100, 40 + count * 5),
-                })
+                suggestions.append(
+                    {
+                        "project": proj,
+                        "action": "commit",
+                        "reason": f"{count} uncommitted files",
+                        "priority": min(100, 40 + count * 5),
+                    }
+                )
 
         # 2. Bookmarked blockers — stuck projects need unblocking
         bookmarks_dir = Path.home() / ".claude" / "bookmarks"
@@ -316,20 +352,26 @@ def register_self_tools(mcp_instance):
                         proj = data.get("project", {}).get("path", "")
                         blockers = data.get("context", {}).get("blockers", [])
                         if proj:
-                            suggestions.append({
-                                "project": shorten_path(proj),
-                                "action": "unblock",
-                                "reason": blockers[0] if blockers else "blocked (no reason given)",
-                                "priority": 90,
-                            })
+                            suggestions.append(
+                                {
+                                    "project": shorten_path(proj),
+                                    "action": "unblock",
+                                    "reason": blockers[0]
+                                    if blockers
+                                    else "blocked (no reason given)",
+                                    "priority": 90,
+                                }
+                            )
                 except (ValueError, OSError):
                     continue
 
         # 3. High-health recent sessions — momentum to continue
         recent = [
-            s for s in all_sessions
+            s
+            for s in all_sessions
             if s["mtime"] >= cutoff
-            and cache_index.get(s["session_id"], {}).get("classification") != "automated"
+            and cache_index.get(s["session_id"], {}).get("classification")
+            != "automated"
             and s.get("project_dir", "") != str(Path.home())
         ]
         # Find the highest-health recent session per project
@@ -345,12 +387,14 @@ def register_self_tools(mcp_instance):
                 # Check if already suggested (dirty/blocked)
                 already = any(sg["project"] == shorten_path(pd) for sg in suggestions)
                 if not already:
-                    suggestions.append({
-                        "project": shorten_path(pd),
-                        "action": "continue",
-                        "reason": f"recent productive session (health {health:.0f})",
-                        "priority": int(health * 0.6),
-                    })
+                    suggestions.append(
+                        {
+                            "project": shorten_path(pd),
+                            "action": "continue",
+                            "reason": f"recent productive session (health {health:.0f})",
+                            "priority": int(health * 0.6),
+                        }
+                    )
 
         suggestions.sort(key=lambda x: x["priority"], reverse=True)
         return {"suggestions": suggestions[:10], "count": len(suggestions)}
@@ -358,8 +402,9 @@ def register_self_tools(mcp_instance):
     # --- Cross-session project changelog ---
 
     @mcp_instance.tool()
-    def what_changed(project: str, hours: int = 168, limit: int = 20,
-                     include_automated: bool = False) -> dict:
+    def what_changed(
+        project: str, hours: int = 168, limit: int = 20, include_automated: bool = False
+    ) -> dict:
         """What happened on a project across sessions in a time window.
 
         Synthesizes across all sessions for a project — not reading one
@@ -375,7 +420,7 @@ def register_self_tools(mcp_instance):
           limit: Max sessions to include (default 20).
           include_automated: If False (default), skip automated sessions.
         """
-        from .mcp_server import _find_all_sessions_cached, _get_cache_index, _get_title, shorten_path
+        from .mcp_server import _find_all_sessions_cached, _get_cache_index, _get_title
 
         all_sessions = _find_all_sessions_cached()
         cutoff = time.time() - hours * 3600
@@ -387,7 +432,8 @@ def register_self_tools(mcp_instance):
             all_sessions = _filter_automated(all_sessions, cache_index)
 
         matched = [
-            s for s in all_sessions
+            s
+            for s in all_sessions
             if project_lower in s.get("project_dir", "").lower()
             and s["mtime"] >= cutoff
         ]
@@ -396,7 +442,9 @@ def register_self_tools(mcp_instance):
 
         if not matched:
             return {
-                "project": project, "hours": hours, "sessions": 0,
+                "project": project,
+                "hours": hours,
+                "sessions": 0,
                 "message": f"No sessions matching '{project}' in the last {hours} hours.",
             }
 
@@ -406,20 +454,34 @@ def register_self_tools(mcp_instance):
         for s in matched:
             sid = s["session_id"]
             title = _get_title(sid, s["file"])
-            entries.append({
-                "session_id": sid,
-                "date": datetime.fromtimestamp(s["mtime"]).strftime("%Y-%m-%d %H:%M"),
-                "title": title or "(no summary)",
-                "size_kb": round(s.get("size", 0) / 1024, 1),
-            })
+            entries.append(
+                {
+                    "session_id": sid,
+                    "date": datetime.fromtimestamp(s["mtime"]).strftime(
+                        "%Y-%m-%d %H:%M"
+                    ),
+                    "title": title or "(no summary)",
+                    "size_kb": round(s.get("size", 0) / 1024, 1),
+                }
+            )
 
         git_commits = []
         if project_path and Path(project_path).is_dir():
             try:
                 since = datetime.fromtimestamp(cutoff).strftime("%Y-%m-%d")
                 log = subprocess.run(
-                    ["git", "log", f"--since={since}", "--oneline", "--format=%h %ar %s", "-20"],
-                    cwd=project_path, capture_output=True, text=True, timeout=5,
+                    [
+                        "git",
+                        "log",
+                        f"--since={since}",
+                        "--oneline",
+                        "--format=%h %ar %s",
+                        "-20",
+                    ],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 git_commits = [l.strip() for l in log.stdout.splitlines() if l.strip()]
             except (subprocess.TimeoutExpired, OSError):
@@ -430,9 +492,14 @@ def register_self_tools(mcp_instance):
             try:
                 status = subprocess.run(
                     ["git", "status", "--porcelain"],
-                    cwd=project_path, capture_output=True, text=True, timeout=5,
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
-                dirty_files = [l.strip() for l in status.stdout.splitlines() if l.strip()][:15]
+                dirty_files = [
+                    l.strip() for l in status.stdout.splitlines() if l.strip()
+                ][:15]
             except (subprocess.TimeoutExpired, OSError):
                 pass
 
@@ -440,6 +507,7 @@ def register_self_tools(mcp_instance):
         topics = None
         try:
             from claude_session_commons.insights import get_db
+
             conn = get_db()
             rows = conn.execute(
                 """SELECT title, summary_text FROM summary_levels
@@ -449,21 +517,25 @@ def register_self_tools(mcp_instance):
             ).fetchall()
             if rows:
                 import json as _json
+
                 topics = []
                 for r in rows:
                     try:
                         s = _json.loads(r[1]) if isinstance(r[1], str) else (r[1] or {})
                     except Exception:
                         s = {}
-                    topics.append({
-                        "topic": s.get("topic_name", r[0]),
-                        "status": s.get("status", ""),
-                    })
+                    topics.append(
+                        {
+                            "topic": s.get("topic_name", r[0]),
+                            "status": s.get("status", ""),
+                        }
+                    )
         except Exception:
             pass
 
         # Latest bookmark for this project — surfaces blockers + next actions
         import json as _json2
+
         bookmark = None
         bookmarks_dir = Path.home() / ".claude" / "bookmarks"
         if bookmarks_dir.is_dir():
@@ -506,8 +578,9 @@ def register_self_tools(mcp_instance):
     # --- Cross-project activity summary ---
 
     @mcp_instance.tool()
-    def my_week(hours: int = 168, min_sessions: int = 1,
-                include_automated: bool = False) -> dict:
+    def my_week(
+        hours: int = 168, min_sessions: int = 1, include_automated: bool = False
+    ) -> dict:
         """What you shipped across ALL projects in a time window.
 
         Cross-project activity summary — not one project but all of them.
@@ -522,7 +595,11 @@ def register_self_tools(mcp_instance):
           include_automated: If False (default), skip sessions classified
             as "automated" by the ML classifier.
         """
-        from .mcp_server import _find_all_sessions_cached, _get_cache_index, shorten_path
+        from .mcp_server import (
+            _find_all_sessions_cached,
+            _get_cache_index,
+            shorten_path,
+        )
 
         all_sessions = _find_all_sessions_cached()
         cutoff = time.time() - hours * 3600
@@ -546,9 +623,11 @@ def register_self_tools(mcp_instance):
         total_sessions = 0
         total_commits = 0
 
-        for pd, sessions in sorted(by_project.items(),
-                                     key=lambda x: max(s["mtime"] for s in x[1]),
-                                     reverse=True):
+        for pd, sessions in sorted(
+            by_project.items(),
+            key=lambda x: max(s["mtime"] for s in x[1]),
+            reverse=True,
+        ):
             if len(sessions) < min_sessions:
                 continue
 
@@ -559,30 +638,48 @@ def register_self_tools(mcp_instance):
                     since = datetime.fromtimestamp(cutoff).strftime("%Y-%m-%d")
                     log = subprocess.run(
                         ["git", "log", f"--since={since}", "--oneline", "-100"],
-                        cwd=pd, capture_output=True, text=True, timeout=5,
+                        cwd=pd,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
-                    commit_count = len([l for l in log.stdout.splitlines() if l.strip()])
+                    commit_count = len(
+                        [l for l in log.stdout.splitlines() if l.strip()]
+                    )
                 except (subprocess.TimeoutExpired, OSError):
                     pass
 
             # Estimate hours from JSONL timestamps (O(1) per session)
             from .session_utils import session_duration_hours
+
             est_hours = sum(session_duration_hours(s["file"]) for s in sessions)
 
             # Average health score across sessions
             from .mcp_server import _session_health
-            health_scores = [_session_health(s, cache_index=cache_index).get("health", 0) for s in sessions]
-            avg_health = round(sum(health_scores) / len(health_scores), 0) if health_scores else 0
+
+            health_scores = [
+                _session_health(s, cache_index=cache_index).get("health", 0)
+                for s in sessions
+            ]
+            avg_health = (
+                round(sum(health_scores) / len(health_scores), 0)
+                if health_scores
+                else 0
+            )
 
             latest = max(s["mtime"] for s in sessions)
-            projects.append({
-                "project": shorten_path(pd),
-                "sessions": len(sessions),
-                "commits": commit_count,
-                "est_hours": round(est_hours, 1),
-                "avg_health": avg_health,
-                "last_active": datetime.fromtimestamp(latest).strftime("%Y-%m-%d %H:%M"),
-            })
+            projects.append(
+                {
+                    "project": shorten_path(pd),
+                    "sessions": len(sessions),
+                    "commits": commit_count,
+                    "est_hours": round(est_hours, 1),
+                    "avg_health": avg_health,
+                    "last_active": datetime.fromtimestamp(latest).strftime(
+                        "%Y-%m-%d %H:%M"
+                    ),
+                }
+            )
             total_sessions += len(sessions)
             total_commits += commit_count
 
@@ -592,12 +689,15 @@ def register_self_tools(mcp_instance):
         # 100 = all sessions on one project. 0 = evenly spread across many.
         # Uses normalized entropy: 1 - H(distribution) / log(N).
         import math as _math
+
         focus_score = 100
         if len(projects) > 1 and total_sessions > 0:
             probs = [p["sessions"] / total_sessions for p in projects]
             entropy = -sum(p * _math.log2(p) for p in probs if p > 0)
             max_entropy = _math.log2(len(projects))
-            focus_score = round((1 - entropy / max_entropy) * 100) if max_entropy > 0 else 100
+            focus_score = (
+                round((1 - entropy / max_entropy) * 100) if max_entropy > 0 else 100
+            )
 
         return {
             "hours": hours,

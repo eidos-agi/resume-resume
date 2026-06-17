@@ -27,6 +27,7 @@ def test_telemetry_root_uses_username():
     assert root.parts[-3:] == (".resume-resume", "telemetry", root.parts[-1])
     # username should be the last segment
     import getpass
+
     assert root.parts[-1] == getpass.getuser()
 
 
@@ -174,6 +175,7 @@ async def test_middleware_captures_error(tmp_path: Path, monkeypatch):
 # Gzip rotation (obs-002)
 # ---------------------------------------------------------------------------
 
+
 def test_gzip_rotation_compresses_old_files(tmp_path: Path, monkeypatch):
     """obs-002: files older than 7 days get gzipped on next write."""
     import gzip as _gzip
@@ -288,7 +290,9 @@ from resume_resume import telemetry_query as tq
 
 
 def _write_events(root: Path, day_offset: int, events: list[dict]) -> None:
-    date = (datetime.now(timezone.utc) - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+    date = (datetime.now(timezone.utc) - timedelta(days=day_offset)).strftime(
+        "%Y-%m-%d"
+    )
     target = root / f"{date}.jsonl"
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a", encoding="utf-8") as f:
@@ -296,8 +300,14 @@ def _write_events(root: Path, day_offset: int, events: list[dict]) -> None:
             f.write(json.dumps(e) + "\n")
 
 
-def _mk_event(tool: str, duration_ms: float = 10.0, status: str = "ok",
-              args: dict | None = None, result=None, ts_offset_s: int = 0) -> dict:
+def _mk_event(
+    tool: str,
+    duration_ms: float = 10.0,
+    status: str = "ok",
+    args: dict | None = None,
+    result=None,
+    ts_offset_s: int = 0,
+) -> dict:
     ts = (datetime.now(timezone.utc) - timedelta(seconds=ts_offset_s)).isoformat()
     return {
         "ts": ts,
@@ -334,11 +344,15 @@ def test_iter_events_skips_bad_lines(tmp_path: Path):
 
 
 def test_load_events_filters(tmp_path: Path):
-    _write_events(tmp_path, 0, [
-        _mk_event("a", status="ok"),
-        _mk_event("a", status="error"),
-        _mk_event("b", status="ok"),
-    ])
+    _write_events(
+        tmp_path,
+        0,
+        [
+            _mk_event("a", status="ok"),
+            _mk_event("a", status="error"),
+            _mk_event("b", status="ok"),
+        ],
+    )
     assert len(tq.load_events(days=1, tool="a", root=tmp_path)) == 2
     assert len(tq.load_events(days=1, tool="a", status="error", root=tmp_path)) == 1
     assert len(tq.load_events(days=1, status="error", root=tmp_path)) == 1
@@ -371,9 +385,36 @@ def test_usage_summary_aggregates():
 
 def test_dead_and_slow_and_error_prone():
     summary = [
-        {"tool": "dead", "count": 1, "errors": 0, "error_rate": 0, "avg_ms": 5, "p50_ms": 5, "p95_ms": 5, "max_ms": 5},
-        {"tool": "slow", "count": 100, "errors": 0, "error_rate": 0, "avg_ms": 50, "p50_ms": 50, "p95_ms": 1500, "max_ms": 2000},
-        {"tool": "buggy", "count": 20, "errors": 5, "error_rate": 0.25, "avg_ms": 10, "p50_ms": 10, "p95_ms": 15, "max_ms": 20},
+        {
+            "tool": "dead",
+            "count": 1,
+            "errors": 0,
+            "error_rate": 0,
+            "avg_ms": 5,
+            "p50_ms": 5,
+            "p95_ms": 5,
+            "max_ms": 5,
+        },
+        {
+            "tool": "slow",
+            "count": 100,
+            "errors": 0,
+            "error_rate": 0,
+            "avg_ms": 50,
+            "p50_ms": 50,
+            "p95_ms": 1500,
+            "max_ms": 2000,
+        },
+        {
+            "tool": "buggy",
+            "count": 20,
+            "errors": 5,
+            "error_rate": 0.25,
+            "avg_ms": 10,
+            "p50_ms": 10,
+            "p95_ms": 15,
+            "max_ms": 20,
+        },
     ]
     assert [r["tool"] for r in tq.dead_tools(summary, threshold=1)] == ["dead"]
     assert [r["tool"] for r in tq.slow_tools(summary, 1000)] == ["slow"]
@@ -426,12 +467,16 @@ def test_session_bundles_groups_bursts():
 
 
 def test_insights_report_shape(tmp_path: Path):
-    _write_events(tmp_path, 0, [
-        _mk_event("search_sessions", duration_ms=5, result=[{"id": 1}]),
-        _mk_event("search_sessions", duration_ms=5, args={"query": "x"}, result=[]),
-        _mk_event("slow_tool", duration_ms=2000),
-        _mk_event("broken_tool", status="error"),
-    ])
+    _write_events(
+        tmp_path,
+        0,
+        [
+            _mk_event("search_sessions", duration_ms=5, result=[{"id": 1}]),
+            _mk_event("search_sessions", duration_ms=5, args={"query": "x"}, result=[]),
+            _mk_event("slow_tool", duration_ms=2000),
+            _mk_event("broken_tool", status="error"),
+        ],
+    )
     report = tq.insights_report(days=1, root=tmp_path)
     assert report["total_calls"] == 4
     assert report["total_errors"] == 1

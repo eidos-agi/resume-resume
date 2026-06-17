@@ -18,12 +18,17 @@ def test_codex_resume_and_fork():
     assert resume_command(CODEX_ID) == f"codex resume {CODEX_UUID}"
     assert resume_command(CODEX_ID, fork=True) == f"codex fork {CODEX_UUID}"
     # Codex has no skip-permissions flag — it's ignored, not appended.
-    assert resume_command(CODEX_ID, skip_permissions=True) == f"codex resume {CODEX_UUID}"
+    assert (
+        resume_command(CODEX_ID, skip_permissions=True) == f"codex resume {CODEX_UUID}"
+    )
 
 
 def test_claude_resume_and_fork():
     assert resume_command(CLAUDE_ID) == f"claude --resume {CLAUDE_ID}"
-    assert resume_command(CLAUDE_ID, fork=True) == f"claude --resume {CLAUDE_ID} --fork-session"
+    assert (
+        resume_command(CLAUDE_ID, fork=True)
+        == f"claude --resume {CLAUDE_ID} --fork-session"
+    )
     assert resume_command(CLAUDE_ID, skip_permissions=True) == (
         f"claude --resume {CLAUDE_ID} --dangerously-skip-permissions"
     )
@@ -33,11 +38,29 @@ def test_cr_paste_parsing_covers_both_tools():
     from resume_resume.cli import _parse_resume_args
 
     assert _parse_resume_args(["claude", "--resume", CLAUDE_ID, "--model", "opus"]) == (
-        CLAUDE_ID, ["--model", "opus"], False, "resume")
-    assert _parse_resume_args(["--resume", CLAUDE_ID]) == (CLAUDE_ID, [], False, "resume")
+        CLAUDE_ID,
+        ["--model", "opus"],
+        False,
+        "resume",
+    )
+    assert _parse_resume_args(["--resume", CLAUDE_ID]) == (
+        CLAUDE_ID,
+        [],
+        False,
+        "resume",
+    )
     assert _parse_resume_args([CLAUDE_ID]) == (CLAUDE_ID, [], False, "resume")
     assert _parse_resume_args(["codex", "resume", CODEX_UUID]) == (
-        CODEX_UUID, [], True, "resume")
-    assert _parse_resume_args(["codex", "fork", CODEX_UUID]) == (CODEX_UUID, [], True, "fork")
+        CODEX_UUID,
+        [],
+        True,
+        "resume",
+    )
+    assert _parse_resume_args(["codex", "fork", CODEX_UUID]) == (
+        CODEX_UUID,
+        [],
+        True,
+        "fork",
+    )
     # A bare full rollout id is recognized as Codex.
     assert _parse_resume_args([CODEX_ID]) == (CODEX_ID, [], True, "resume")

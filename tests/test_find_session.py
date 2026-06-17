@@ -28,7 +28,9 @@ def session_roots(tmp_path, monkeypatch):
     proj_dir = projects / "-Users-dshanklinbv-repos-eidos-agi-resume-resume"
     proj_dir.mkdir(parents=True)
     claude_file = proj_dir / f"{CLAUDE_UUID}.jsonl"
-    claude_file.write_text(json.dumps({"type": "user", "message": {"content": "hi"}}) + "\n")
+    claude_file.write_text(
+        json.dumps({"type": "user", "message": {"content": "hi"}}) + "\n"
+    )
 
     # Codex: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
     codex_root = tmp_path / "codex"
@@ -36,7 +38,13 @@ def session_roots(tmp_path, monkeypatch):
     day_dir.mkdir(parents=True)
     codex_file = day_dir / f"{CODEX_ID}.jsonl"
     codex_file.write_text(
-        json.dumps({"type": "session_meta", "payload": {"cwd": "/Users/dshanklinbv/repos-jetta-operating"}}) + "\n"
+        json.dumps(
+            {
+                "type": "session_meta",
+                "payload": {"cwd": "/Users/dshanklinbv/repos-jetta-operating"},
+            }
+        )
+        + "\n"
     )
 
     monkeypatch.setattr(ms, "PROJECTS_DIR", projects)

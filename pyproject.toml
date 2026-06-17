@@ -36,3 +36,10 @@ cr = "resume_resume.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["resume_resume*"]
+
+[tool.ruff.lint]
+# Legacy/style rules this codebase doesn't enforce: lazy/conditional imports
+# (E402), short loop names (E741), and assigned-but-unused locals (F841) are
+# pre-existing and not worth risky mechanical edits. Real bugs (F811, etc.)
+# still fail.
+ignore = ["E402", "E741", "F841"]

@@ -22,10 +22,16 @@ from .sessions import (
     MAX_SESSIONS_ALL,
 )
 from claude_session_commons import decode_project_path
-from claude_session_commons.summarize import analyze_patterns, summarize_deep, summarize_quick
+from claude_session_commons.summarize import (
+    analyze_patterns,
+    summarize_deep,
+    summarize_quick,
+)
 from .ui import SessionPickerApp
 
-UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
+)
 # Unanchored: pull a session id out of a pasted command (e.g. "cd x && claude --resume <id>").
 ID_IN_TEXT = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|rollout-[\w-]+", re.I
@@ -43,22 +49,24 @@ def _read_key() -> str | None:
     try:
         tty.setraw(fd)
         ch = sys.stdin.read(1)
-        if ch == '\x1b':  # escape sequence
+        if ch == "\x1b":  # escape sequence
             # Peek for arrow key sequences (don't block)
             import select
+
             if select.select([sys.stdin], [], [], 0.05)[0]:
                 sys.stdin.read(1)  # consume [
                 sys.stdin.read(1)  # consume A/B/C/D
-            return 'esc'
-        if ch == '\x03':  # Ctrl-C
+            return "esc"
+        if ch == "\x03":  # Ctrl-C
             return None
-        if ch == '\x04':  # Ctrl-D
+        if ch == "\x04":  # Ctrl-D
             return None
         return ch
     except (KeyboardInterrupt, EOFError):
         return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
 
 USAGE = """\
 claude-resume — Post-crash Claude Code session picker.
@@ -115,12 +123,13 @@ def _daemon_alive() -> bool:
 def _clean_title(title: str) -> str:
     """Strip XML/HTML tags and command artifacts from cached titles."""
     import re
+
     if not title:
         return ""
     # Remove XML/HTML tags
-    title = re.sub(r'<[^>]+>', '', title)
+    title = re.sub(r"<[^>]+>", "", title)
     # Collapse whitespace
-    title = re.sub(r'\s+', ' ', title).strip()
+    title = re.sub(r"\s+", " ", title).strip()
     return title
 
 
@@ -133,7 +142,11 @@ def _search_sessions(term: str):
     term_bytes = term.lower().encode("utf-8", errors="replace")
     all_sessions = find_all_sessions()
 
-    print(f"\n  Searching {len(all_sessions)} sessions for \033[1m{term}\033[0m...", end="", flush=True)
+    print(
+        f"\n  Searching {len(all_sessions)} sessions for \033[1m{term}\033[0m...",
+        end="",
+        flush=True,
+    )
 
     def _check(s):
         try:
@@ -152,7 +165,7 @@ def _search_sessions(term: str):
     # Sort by recency — most recent first (visible at bottom in scrolling terminal)
     matches.sort(key=lambda r: r[0]["mtime"], reverse=True)
 
-    print(f" done.\n")
+    print(" done.\n")
 
     for i, (s, count) in enumerate(matches, 1):
         dt = datetime.fromtimestamp(s["mtime"])
@@ -175,14 +188,18 @@ def _search_sessions(term: str):
 
         title_display = f"  \033[2m{title[:65]}\033[0m" if title else ""
 
-        print(f"  \033[1;33m{i:2d}\033[0m  {project}  \033[2m{age}  ({count_str})\033[0m{title_display}")
+        print(
+            f"  \033[1;33m{i:2d}\033[0m  {project}  \033[2m{age}  ({count_str})\033[0m{title_display}"
+        )
         print(f"      \033[36mclaude --resume {sid}\033[0m")
         print()
 
     if not matches:
-        print(f"  No sessions found containing \"{term}\".\n")
+        print(f'  No sessions found containing "{term}".\n')
     else:
-        print(f"  \033[1;32m{len(matches)} session{'s' if len(matches) != 1 else ''} found.\033[0m\n")
+        print(
+            f"  \033[1;32m{len(matches)} session{'s' if len(matches) != 1 else ''} found.\033[0m\n"
+        )
 
 
 def _cache_all_sessions():
@@ -212,6 +229,7 @@ def _cache_all_sessions():
         task_dir.mkdir(parents=True, exist_ok=True)
         for s in uncached:
             import time
+
             priority = int(time.time() * 1000)
             filename = f"{priority}-summarize-{s['session_id'][:8]}.json"
             task = {
@@ -223,9 +241,11 @@ def _cache_all_sessions():
             }
             (task_dir / filename).write_text(json.dumps(task))
             time.sleep(0.001)  # ensure unique timestamps
-        print(f"\n  Daemon is running — queued {len(uncached)} sessions for processing.")
+        print(
+            f"\n  Daemon is running — queued {len(uncached)} sessions for processing."
+        )
         print(f"  ({cached} already cached)")
-        print(f"  Monitor: tail -f ~/.claude/daemon.log\n")
+        print("  Monitor: tail -f ~/.claude/daemon.log\n")
         return
 
     # Fallback: local processing (daemon not running)
@@ -233,7 +253,10 @@ def _cache_all_sessions():
     generated = 0
     failed = 0
 
-    print(f"\n  Daemon not running — indexing {len(uncached)} sessions locally...\n", flush=True)
+    print(
+        f"\n  Daemon not running — indexing {len(uncached)} sessions locally...\n",
+        flush=True,
+    )
 
     for i, s in enumerate(uncached, 1):
         ck = cache.cache_key(s["file"])
@@ -256,7 +279,9 @@ def _cache_all_sessions():
             print(f" \033[31mfailed: {e}\033[0m", flush=True)
             failed += 1
 
-    print(f"\n  Done. {cached} already cached, {generated} newly indexed, {failed} failed.\n")
+    print(
+        f"\n  Done. {cached} already cached, {generated} newly indexed, {failed} failed.\n"
+    )
 
 
 def _get_cached_title(cache, s):
@@ -278,7 +303,6 @@ def _get_cached_title(cache, s):
 def _preview_session(s, cache):
     """Show a quick preview of a session before resuming."""
     import json
-    from datetime import datetime
 
     sid = s["session_id"]
     project = shorten_path(s["project_dir"])
@@ -319,7 +343,9 @@ def _preview_session(s, cache):
         for line in reversed(lines):
             try:
                 entry = json.loads(line)
-                if entry.get("type") == "user" and isinstance(entry.get("message"), dict):
+                if entry.get("type") == "user" and isinstance(
+                    entry.get("message"), dict
+                ):
                     content = entry["message"].get("content", "")
                     if isinstance(content, str) and len(content) > 5:
                         user_msgs.append(content[:100])
@@ -336,7 +362,7 @@ def _preview_session(s, cache):
                 break
 
         if user_msgs:
-            print(f"\n  \033[1mLast messages:\033[0m")
+            print("\n  \033[1mLast messages:\033[0m")
             for msg in reversed(user_msgs):
                 cleaned = _clean_title(msg)
                 print(f"    \033[33m>\033[0m {cleaned}")
@@ -344,19 +370,21 @@ def _preview_session(s, cache):
         pass
 
     print(f"  \033[1;36m{'─' * 60}\033[0m")
-    print(f"\n  \033[2m[enter] resume  [esc] back\033[0m", flush=True)
+    print("\n  \033[2m[enter] resume  [esc] back\033[0m", flush=True)
 
     while True:
         key = _read_key()
-        if key is None or key == 'esc':
+        if key is None or key == "esc":
             return False  # go back
-        if key in ('\r', '\n'):
+        if key in ("\r", "\n"):
             return True  # resume
 
 
 def _show_group_menu(sorted_groups, cache, hours, total_sessions):
     """Display the group selection menu. Returns selected index or None."""
-    print(f"\n  \033[1m{total_sessions} sessions \033[1;36m→\033[0m\033[1m {len(sorted_groups)} groups\033[0m  \033[2m(last {hours}h)\033[0m\n")
+    print(
+        f"\n  \033[1m{total_sessions} sessions \033[1;36m→\033[0m\033[1m {len(sorted_groups)} groups\033[0m  \033[2m(last {hours}h)\033[0m\n"
+    )
 
     for i, (org, group_sessions) in enumerate(sorted_groups, 1):
         most_recent = max(s["mtime"] for s in group_sessions)
@@ -367,14 +395,20 @@ def _show_group_menu(sorted_groups, cache, hours, total_sessions):
         title = _get_cached_title(cache, newest)
         title_str = f"  \033[2m{title[:50]}\033[0m" if title else ""
 
-        print(f"  \033[1;33m{i:2d}\033[0m  \033[1;36m{org}\033[0m  \033[2m({count} session{'s' if count != 1 else ''}, {age})\033[0m{title_str}")
+        print(
+            f"  \033[1;33m{i:2d}\033[0m  \033[1;36m{org}\033[0m  \033[2m({count} session{'s' if count != 1 else ''}, {age})\033[0m{title_str}"
+        )
 
-    print(f"\n  \033[2m[1-{len(sorted_groups)}] select  [esc/q] quit\033[0m", flush=True)
+    print(
+        f"\n  \033[2m[1-{len(sorted_groups)}] select  [esc/q] quit\033[0m", flush=True
+    )
 
 
 def _show_session_menu(org, group_sessions, cache):
     """Display the session selection menu."""
-    print(f"\n  \033[1;36m{org}\033[0m  \033[2m({len(group_sessions)} sessions)\033[0m\n")
+    print(
+        f"\n  \033[1;36m{org}\033[0m  \033[2m({len(group_sessions)} sessions)\033[0m\n"
+    )
 
     for i, s in enumerate(group_sessions, 1):
         sid = s["session_id"]
@@ -430,11 +464,11 @@ def _cluster_sessions(hours: int = 48):
         _show_group_menu(sorted_groups, cache, hours, len(sessions))
 
         key = _read_key()
-        if key is None or key in ('esc', 'q'):
+        if key is None or key in ("esc", "q"):
             print()
             return
 
-        if not key.isdigit() or key == '0':
+        if not key.isdigit() or key == "0":
             continue
 
         group_idx = int(key) - 1
@@ -449,10 +483,10 @@ def _cluster_sessions(hours: int = 48):
             _show_session_menu(org, group_sessions, cache)
 
             key = _read_key()
-            if key is None or key == 'esc':
+            if key is None or key == "esc":
                 break  # back to groups
 
-            if not key.isdigit() or key == '0':
+            if not key.isdigit() or key == "0":
                 continue
 
             sess_idx = int(key) - 1
@@ -467,8 +501,10 @@ def _cluster_sessions(hours: int = 48):
                 print(f"\n  \033[1;32m⟶ Resuming {s['session_id'][:8]}...\033[0m\n")
                 os.chdir(s["project_dir"])
                 os.execlp(
-                    "claude", "claude",
-                    "--resume", s["session_id"],
+                    "claude",
+                    "claude",
+                    "--resume",
+                    s["session_id"],
                     "--dangerously-skip-permissions",
                 )
             # else: user pressed Esc, back to session list
@@ -572,7 +608,7 @@ def _resume_from_paste(argv: list[str]):
     else:
         project_path = _find_session_project(session_id)
         if project_path is None:
-            print(f"  \033[31m✗ Session not found in any project directory\033[0m")
+            print("  \033[31m✗ Session not found in any project directory\033[0m")
             sys.exit(1)
         if not os.path.isdir(project_path):
             print(f"  \033[31m✗ Resolved path does not exist: {project_path}\033[0m")
@@ -590,7 +626,7 @@ def _resume_from_paste(argv: list[str]):
     cwd_display = project_path or "(current dir — cwd not recorded)"
     project_name = os.path.basename(project_path) if project_path else "current dir"
 
-    print(f"  \033[32m✓ Found!\033[0m")
+    print("  \033[32m✓ Found!\033[0m")
     print(f"  \033[90mResolved cwd: {cwd_display}\033[0m")
     print()
     print(f"  \033[36m→\033[0m Resuming in \033[1m{project_name}\033[0m")
@@ -598,16 +634,17 @@ def _resume_from_paste(argv: list[str]):
     print()
 
     # macOS dialog — visible proof outside the TUI
-    dialog_msg = (
-        f"✓ Session: {session_id[:8]}…\\n"
-        f"📂 cwd: {cwd_display}\\n\\n"
-        f"{cmd_str}"
+    dialog_msg = f"✓ Session: {session_id[:8]}…\\n📂 cwd: {cwd_display}\\n\\n{cmd_str}"
+    subprocess.Popen(
+        [
+            "osascript",
+            "-e",
+            f'tell application "System Events" to display dialog "{dialog_msg}" '
+            f'with title "{title}" buttons {{"OK"}} default button "OK" giving up after 5',
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
-    subprocess.Popen([
-        "osascript", "-e",
-        f'tell application "System Events" to display dialog "{dialog_msg}" '
-        f'with title "{title}" buttons {{"OK"}} default button "OK" giving up after 5'
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     if project_path and os.path.isdir(project_path):
         os.chdir(project_path)
@@ -622,8 +659,10 @@ def _paste_box_or_fallthrough():
     Blank line / Ctrl-D / Ctrl-C -> return so the normal session picker shows.
     """
     try:
-        print("\n  \033[1m📋 Paste a resume command, session id, or chat text"
-              " — or press Enter for the list:\033[0m")
+        print(
+            "\n  \033[1m📋 Paste a resume command, session id, or chat text"
+            " — or press Enter for the list:\033[0m"
+        )
         line = _read_paste()
     except (EOFError, KeyboardInterrupt):
         print()
@@ -686,8 +725,12 @@ def _scan_candidates(paste: str, limit: int = 6):
 
         def _progress(done, total):
             if done == 1 or done == total or done % 50 == 0:
-                print(f"\r  \033[90mindexing sessions… {done}/{total}\033[0m",
-                      end="", file=sys.stderr, flush=True)
+                print(
+                    f"\r  \033[90mindexing sessions… {done}/{total}\033[0m",
+                    end="",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
         n = paste_index.refresh(con, progress=_progress if not built else None)
         if not built and n:
@@ -705,6 +748,7 @@ def _plog(msg: str) -> None:
     """Append a line to the paste-resolution debug log (best-effort, sync)."""
     try:
         from datetime import datetime
+
         PASTE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with open(PASTE_LOG, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now().isoformat(timespec='seconds')} {msg}\n")
@@ -760,6 +804,7 @@ def _normalize_ws(s: str) -> str:
     """Shared normalizer — see paste_index.normalize_ws. Kept here as a stable
     name for callers/tests."""
     from .paste_index import normalize_ws
+
     return normalize_ws(s)
 
 
@@ -769,7 +814,10 @@ def _paste_coverage(paste: str, session_text: str, n: int = 5) -> float:
     coincidental keyword overlap, tolerant of text scattered across the session.
     Delegates to the shared scorer so the index and this share one definition."""
     from .paste_index import _shingles, coverage, normalize_ws
-    return coverage(_shingles(normalize_ws(paste).split(), n), normalize_ws(session_text))
+
+    return coverage(
+        _shingles(normalize_ws(paste).split(), n), normalize_ws(session_text)
+    )
 
 
 def main():
@@ -786,6 +834,7 @@ def main():
     # cr v2 — new TUI
     if len(sys.argv) > 1 and sys.argv[1] == "v2":
         from .ui_v2 import run_v2
+
         hours = 48
         search_term = None
         args = sys.argv[2:]
@@ -859,7 +908,11 @@ def main():
                 sys.exit(1)
 
     max_sessions = MAX_SESSIONS_ALL if show_all else None
-    sessions = find_recent_sessions(hours, max_sessions=max_sessions) if max_sessions else find_recent_sessions(hours)
+    sessions = (
+        find_recent_sessions(hours, max_sessions=max_sessions)
+        if max_sessions
+        else find_recent_sessions(hours)
+    )
 
     if not sessions:
         print(f"  No sessions found in the last {int(hours)} hours.")
@@ -868,8 +921,20 @@ def main():
 
     # Sort by date group first (preserves grouping), then by interruption score within each group
     from .sessions import get_date_group as _get_date_group
-    group_order = {"Today": 0, "Yesterday": 1, "Last 7 Days": 2, "Last 30 Days": 3, "Older": 4}
-    sessions.sort(key=lambda s: (group_order.get(_get_date_group(s["mtime"]), 9), -interruption_score(s)))
+
+    group_order = {
+        "Today": 0,
+        "Yesterday": 1,
+        "Last 7 Days": 2,
+        "Last 30 Days": 3,
+        "Older": 4,
+    }
+    sessions.sort(
+        key=lambda s: (
+            group_order.get(_get_date_group(s["mtime"]), 9),
+            -interruption_score(s),
+        )
+    )
 
     cache = SessionCache()
     ops = SessionOps(
@@ -899,7 +964,7 @@ def main():
 
     if action == "resume":
         # Exec directly into the session — replaces this process
-        print(f"\n  \033[1;32m⟶ Resuming session...\033[0m\n")
+        print("\n  \033[1;32m⟶ Resuming session...\033[0m\n")
         os.execlp("bash", "bash", "-c", cmd)
 
     elif action == "multi_resume":
@@ -910,5 +975,5 @@ def main():
 
     elif action == "select":
         _copy_to_clipboard(cmd)
-        print(f"\n  \033[1;32m✓ Copied to clipboard:\033[0m")
+        print("\n  \033[1;32m✓ Copied to clipboard:\033[0m")
         print(f"    {cmd}\n")

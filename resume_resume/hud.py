@@ -98,6 +98,7 @@ class _Delegate(AppKit.NSObject):
 
 class _NavDelegate(AppKit.NSObject):
     """Detects when WKWebView finishes loading HTML."""
+
     hud = None  # set by ProgressHUD
 
     def webView_didFinishNavigation_(self, webView, navigation):
@@ -115,16 +116,22 @@ class ProgressHUD:
         self._ready = False
         self._queue = []  # events buffered until page loads
 
-        style = (AppKit.NSWindowStyleMaskTitled | AppKit.NSWindowStyleMaskClosable
-                 | AppKit.NSWindowStyleMaskUtilityWindow)
+        style = (
+            AppKit.NSWindowStyleMaskTitled
+            | AppKit.NSWindowStyleMaskClosable
+            | AppKit.NSWindowStyleMaskUtilityWindow
+        )
 
         screen = AppKit.NSScreen.mainScreen().frame()
-        frame = Foundation.NSMakeRect(screen.size.width - HUD_WIDTH - 20, 60,
-                                      HUD_WIDTH, HUD_HEIGHT)
+        frame = Foundation.NSMakeRect(
+            screen.size.width - HUD_WIDTH - 20, 60, HUD_WIDTH, HUD_HEIGHT
+        )
 
-        self._panel = AppKit.NSPanel.alloc() \
-            .initWithContentRect_styleMask_backing_defer_(
-                frame, style, AppKit.NSBackingStoreBuffered, False)
+        self._panel = (
+            AppKit.NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
+                frame, style, AppKit.NSBackingStoreBuffered, False
+            )
+        )
         self._panel.setTitle_("resume-resume")
         self._panel.setFloatingPanel_(True)
         self._panel.setBecomesKeyOnlyIfNeeded_(True)
@@ -133,18 +140,24 @@ class ProgressHUD:
         self._panel.setCollectionBehavior_(
             AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
             | AppKit.NSWindowCollectionBehaviorStationary
-            | AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary)
+            | AppKit.NSWindowCollectionBehaviorFullScreenAuxiliary
+        )
         self._panel.setAlphaValue_(1.0)
         self._panel.setOpaque_(True)
         self._panel.setBackgroundColor_(
-            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(0.08, 0.08, 0.10, 1.0))
+            AppKit.NSColor.colorWithCalibratedRed_green_blue_alpha_(
+                0.08, 0.08, 0.10, 1.0
+            )
+        )
         self._panel.setDelegate_(_Delegate.alloc().init())
 
         cfg = WebKit.WKWebViewConfiguration.alloc().init()
         self._wv = WebKit.WKWebView.alloc().initWithFrame_configuration_(
-            Foundation.NSMakeRect(0, 0, HUD_WIDTH, HUD_HEIGHT - 22), cfg)
+            Foundation.NSMakeRect(0, 0, HUD_WIDTH, HUD_HEIGHT - 22), cfg
+        )
         self._wv.setAutoresizingMask_(
-            AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable)
+            AppKit.NSViewWidthSizable | AppKit.NSViewHeightSizable
+        )
         self._wv.setValue_forKey_(False, "drawsBackground")
 
         # Navigation delegate to detect page load
@@ -183,8 +196,10 @@ class ProgressHUD:
             self._wv.evaluateJavaScript_completionHandler_(js, None)  # noqa: eval-ok
         else:
             _js_ref = js
+
             def _run():
                 self._wv.evaluateJavaScript_completionHandler_(_js_ref, None)  # noqa: eval-ok
+
             Foundation.NSObject.alloc().init().performSelectorOnMainThread_withObject_waitUntilDone_(
                 objc.selector(lambda s, o: _run(), signature=b"v@:@"), None, False
             )
@@ -192,9 +207,10 @@ class ProgressHUD:
 
 # ── stdin mode ──────────────────────────────────────────────
 
+
 def _drain(stream, hud):
     for raw in stream:
-        line = (raw.strip() if isinstance(raw, str) else raw.decode().strip())
+        line = raw.strip() if isinstance(raw, str) else raw.decode().strip()
         if not line:
             continue
         try:
@@ -214,6 +230,7 @@ def run_stdin():
 
 
 # ── socket mode (multiplexer) ──────────────────────────────
+
 
 def run_socket(path: str = SOCKET_PATH):
     sock_path = Path(path)
@@ -239,15 +256,20 @@ def run_socket(path: str = SOCKET_PATH):
                 continue
             for s in ready:
                 if s is srv:
-                    c, _ = srv.accept(); c.setblocking(False)
-                    clients.append(c); bufs[c] = b""
+                    c, _ = srv.accept()
+                    c.setblocking(False)
+                    clients.append(c)
+                    bufs[c] = b""
                 else:
                     try:
                         d = s.recv(4096)
                     except (ConnectionResetError, OSError):
                         d = b""
                     if not d:
-                        clients.remove(s); del bufs[s]; s.close(); continue
+                        clients.remove(s)
+                        del bufs[s]
+                        s.close()
+                        continue
                     bufs[s] += d
                     while b"\n" in bufs[s]:
                         ln, bufs[s] = bufs[s].split(b"\n", 1)

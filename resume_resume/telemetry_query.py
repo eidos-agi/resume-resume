@@ -40,6 +40,7 @@ def _day_files(root: Path, days: int) -> list[Path]:
 def _open_jsonl(path: Path):
     """Open a .jsonl or .jsonl.gz file for text reading."""
     import gzip
+
     if path.suffix == ".gz":
         return gzip.open(path, "rt", encoding="utf-8")
     return path.open("r", encoding="utf-8")
@@ -109,16 +110,18 @@ def usage_summary(events: list[dict]) -> list[dict]:
     for tool, calls in by_tool.items():
         durs = [c.get("duration_ms", 0) for c in calls]
         errs = sum(1 for c in calls if c.get("status") == "error")
-        rows.append({
-            "tool": tool,
-            "count": len(calls),
-            "errors": errs,
-            "error_rate": round(errs / len(calls), 4),
-            "avg_ms": round(sum(durs) / len(durs), 2),
-            "p50_ms": round(_percentile(durs, 0.50), 2),
-            "p95_ms": round(_percentile(durs, 0.95), 2),
-            "max_ms": round(max(durs), 2),
-        })
+        rows.append(
+            {
+                "tool": tool,
+                "count": len(calls),
+                "errors": errs,
+                "error_rate": round(errs / len(calls), 4),
+                "avg_ms": round(sum(durs) / len(durs), 2),
+                "p50_ms": round(_percentile(durs, 0.50), 2),
+                "p95_ms": round(_percentile(durs, 0.95), 2),
+                "max_ms": round(max(durs), 2),
+            }
+        )
     rows.sort(key=lambda r: r["count"], reverse=True)
     return rows
 
@@ -131,8 +134,12 @@ def slow_tools(summary: list[dict], p95_threshold_ms: float) -> list[dict]:
     return [r for r in summary if r["p95_ms"] >= p95_threshold_ms]
 
 
-def error_prone_tools(summary: list[dict], min_rate: float, min_calls: int = 3) -> list[dict]:
-    return [r for r in summary if r["error_rate"] >= min_rate and r["count"] >= min_calls]
+def error_prone_tools(
+    summary: list[dict], min_rate: float, min_calls: int = 3
+) -> list[dict]:
+    return [
+        r for r in summary if r["error_rate"] >= min_rate and r["count"] >= min_calls
+    ]
 
 
 def abandoned_queries(events: list[dict]) -> list[dict]:
@@ -191,14 +198,16 @@ def session_bundles(events: list[dict], gap_seconds: float = 30.0) -> list[dict]
                 return
             start = min(starts)
             durs = [c.get("duration_ms", 0) for c in current]
-            bundles.append({
-                "session_id": sid,
-                "start": start.isoformat(),
-                "call_count": len(current),
-                "tools": sorted({c["tool"] for c in current if c.get("tool")}),
-                "duration_ms": round(sum(durs), 2),
-                "had_error": any(c.get("status") == "error" for c in current),
-            })
+            bundles.append(
+                {
+                    "session_id": sid,
+                    "start": start.isoformat(),
+                    "call_count": len(current),
+                    "tools": sorted({c["tool"] for c in current if c.get("tool")}),
+                    "duration_ms": round(sum(durs), 2),
+                    "had_error": any(c.get("status") == "error" for c in current),
+                }
+            )
 
         for c in calls:
             ts = _parse_ts(c.get("ts"))
@@ -294,6 +303,7 @@ def _load_thresholds_safe() -> dict:
     """Import lazily to avoid circular import (meta_ai imports from here)."""
     try:
         from .meta_ai import load_thresholds
+
         return load_thresholds()
     except Exception:
         return {
@@ -341,7 +351,9 @@ def insights_report(days: int = 30, root: Path | None = None) -> dict:
         "dead_tools": dead,
         "dead_tools_suppressed_below_volume": total < min_volume,
         "slow_tools": slow_tools(summary, p95_threshold_ms=slow_p95),
-        "error_prone_tools": error_prone_tools(summary, min_rate=err_rate, min_calls=err_min_calls),
+        "error_prone_tools": error_prone_tools(
+            summary, min_rate=err_rate, min_calls=err_min_calls
+        ),
         "abandoned_queries": [
             {"ts": e.get("ts"), "tool": e.get("tool"), "args": e.get("args")}
             for e in abandoned_queries(events)[:abandoned_limit]

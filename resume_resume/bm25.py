@@ -17,8 +17,8 @@ import time
 from dataclasses import dataclass, field
 
 # BM25 tuning parameters
-K1 = 1.5   # term frequency saturation (higher = slower saturation)
-B = 0.75   # length normalization (0 = no normalization, 1 = full)
+K1 = 1.5  # term frequency saturation (higher = slower saturation)
+B = 0.75  # length normalization (0 = no normalization, 1 = full)
 
 # Signal weights (must sum to 1.0)
 W_SUMMARY = 0.60
@@ -34,23 +34,115 @@ _LAMBDA = math.log(2) / (HALF_LIFE_DAYS * 86400)
 # every Claude Code session and never carry search signal. Adding these
 # was motivated by benchmark queries Q13/Q15/Q21 scoring WEAK because
 # generic dev terms diluted IDF for the distinctive terms in the query.
-_STOP_WORDS = frozenset({
-    # English
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "it", "was", "be", "are", "were",
-    "been", "has", "had", "do", "did", "will", "would", "could", "should",
-    "not", "no", "this", "that", "these", "those", "i", "you", "we", "he",
-    "she", "they", "my", "your", "our", "his", "her", "its", "their",
-    # Dev-domain: appear in >80% of sessions, never search-distinctive
-    "file", "files", "code", "run", "use", "using", "set", "get", "new",
-    "add", "just", "like", "also", "can", "one", "now", "here", "want",
-    "need", "make", "way", "see", "so", "if", "then", "else", "try",
-    "let", "ll", "re", "ve", "don", "doesn", "didn", "won", "isn",
-    # Code/JSON literals (appear in every tool output)
-    "true", "false", "null", "none", "return", "def", "class", "import",
-    # Tool output noise
-    "line", "lines", "output", "input", "result", "value", "type", "name",
-})
+_STOP_WORDS = frozenset(
+    {
+        # English
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "is",
+        "it",
+        "was",
+        "be",
+        "are",
+        "were",
+        "been",
+        "has",
+        "had",
+        "do",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "not",
+        "no",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "we",
+        "he",
+        "she",
+        "they",
+        "my",
+        "your",
+        "our",
+        "his",
+        "her",
+        "its",
+        "their",
+        # Dev-domain: appear in >80% of sessions, never search-distinctive
+        "file",
+        "files",
+        "code",
+        "run",
+        "use",
+        "using",
+        "set",
+        "get",
+        "new",
+        "add",
+        "just",
+        "like",
+        "also",
+        "can",
+        "one",
+        "now",
+        "here",
+        "want",
+        "need",
+        "make",
+        "way",
+        "see",
+        "so",
+        "if",
+        "then",
+        "else",
+        "try",
+        "let",
+        "ll",
+        "re",
+        "ve",
+        "don",
+        "doesn",
+        "didn",
+        "won",
+        "isn",
+        # Code/JSON literals (appear in every tool output)
+        "true",
+        "false",
+        "null",
+        "none",
+        "return",
+        "def",
+        "class",
+        "import",
+        # Tool output noise
+        "line",
+        "lines",
+        "output",
+        "input",
+        "result",
+        "value",
+        "type",
+        "name",
+    }
+)
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -63,6 +155,7 @@ def tokenize(text: str) -> list[str]:
 @dataclass
 class CorpusStats:
     """Pre-computed corpus-level statistics for BM25 IDF calculation."""
+
     total_docs: int = 0
     # doc frequency: how many docs contain each term
     doc_freq_summary: dict[str, int] = field(default_factory=dict)
@@ -93,11 +186,16 @@ def build_corpus_stats(cache_index: dict) -> CorpusStats:
         # Summary text
         summary = data.get("summary")
         if isinstance(summary, dict):
-            summary_text = " ".join(filter(None, [
-                summary.get("title", ""),
-                summary.get("goal", summary.get("objective", "")),
-                summary.get("what_was_done", summary.get("progress", "")),
-            ]))
+            summary_text = " ".join(
+                filter(
+                    None,
+                    [
+                        summary.get("title", ""),
+                        summary.get("goal", summary.get("objective", "")),
+                        summary.get("what_was_done", summary.get("progress", "")),
+                    ],
+                )
+            )
             if summary_text.strip():
                 tokens = tokenize(summary_text)
                 total_summary_len += len(tokens)
@@ -131,8 +229,13 @@ def _idf(term: str, doc_freq: dict[str, int], total_docs: int) -> float:
     return math.log((total_docs - df + 0.5) / (df + 0.5) + 1.0)
 
 
-def _bm25_score(query_tokens: list[str], doc_text: str, doc_freq: dict[str, int],
-                total_docs: int, avg_dl: float) -> float:
+def _bm25_score(
+    query_tokens: list[str],
+    doc_text: str,
+    doc_freq: dict[str, int],
+    total_docs: int,
+    avg_dl: float,
+) -> float:
     """Compute BM25 score for a single document against a query."""
     doc_tokens = tokenize(doc_text)
     dl = len(doc_tokens)
@@ -158,9 +261,14 @@ def _bm25_score(query_tokens: list[str], doc_text: str, doc_freq: dict[str, int]
     return score
 
 
-def score_session(query_tokens: list[str], cached_data: dict | None,
-                  raw_term_count: int, raw_text_len: int,
-                  mtime: float, corpus: CorpusStats) -> tuple[float, float, float, float]:
+def score_session(
+    query_tokens: list[str],
+    cached_data: dict | None,
+    raw_term_count: int,
+    raw_text_len: int,
+    mtime: float,
+    corpus: CorpusStats,
+) -> tuple[float, float, float, float]:
     """Score a single session using BM25 summary + BM25 raw + recency.
 
     Returns (final_score, summary_score, raw_score, recency_score) for
@@ -171,15 +279,22 @@ def score_session(query_tokens: list[str], cached_data: dict | None,
     if cached_data:
         summary = cached_data.get("summary")
         if isinstance(summary, dict):
-            summary_text = " ".join(filter(None, [
-                summary.get("title", ""),
-                summary.get("goal", summary.get("objective", "")),
-                summary.get("what_was_done", summary.get("progress", "")),
-            ]))
+            summary_text = " ".join(
+                filter(
+                    None,
+                    [
+                        summary.get("title", ""),
+                        summary.get("goal", summary.get("objective", "")),
+                        summary.get("what_was_done", summary.get("progress", "")),
+                    ],
+                )
+            )
             if summary_text.strip():
                 summary_score = _bm25_score(
-                    query_tokens, summary_text,
-                    corpus.doc_freq_summary, corpus.total_docs,
+                    query_tokens,
+                    summary_text,
+                    corpus.doc_freq_summary,
+                    corpus.total_docs,
                     corpus.avg_len_summary,
                 )
 
@@ -210,18 +325,23 @@ def score_session(query_tokens: list[str], cached_data: dict | None,
     # Normalize BM25 scores to roughly 0-1 range for fair weighting.
     # We use a sigmoid-like squash: score / (score + k) which maps [0,∞) to [0,1)
     _SQUASH_K_SUMMARY = 3.0  # expected "good" summary BM25 score
-    _SQUASH_K_RAW = 5.0      # expected "good" raw BM25 score
+    _SQUASH_K_RAW = 5.0  # expected "good" raw BM25 score
 
-    norm_summary = summary_score / (summary_score + _SQUASH_K_SUMMARY) if summary_score > 0 else 0.0
+    norm_summary = (
+        summary_score / (summary_score + _SQUASH_K_SUMMARY)
+        if summary_score > 0
+        else 0.0
+    )
     norm_raw = raw_score / (raw_score + _SQUASH_K_RAW) if raw_score > 0 else 0.0
 
-    final = (
-        W_SUMMARY * norm_summary +
-        W_RAW * norm_raw +
-        W_RECENCY * recency_score
-    )
+    final = W_SUMMARY * norm_summary + W_RAW * norm_raw + W_RECENCY * recency_score
 
     # Scale to 0-100 for readability
     final_100 = round(final * 100, 1)
 
-    return final_100, round(summary_score, 3), round(raw_score, 3), round(recency_score, 3)
+    return (
+        final_100,
+        round(summary_score, 3),
+        round(raw_score, 3),
+        round(recency_score, 3),
+    )

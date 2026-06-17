@@ -16,12 +16,18 @@ CODEX_ROLLOUT = (
 
 
 def test_session_tool_labels_by_source():
-    assert session_tool("rollout-2026-06-12T08-36-57-019ebc0c-9f4f-7362-9d26-fb071dfeecbe") == "codex"
+    assert (
+        session_tool("rollout-2026-06-12T08-36-57-019ebc0c-9f4f-7362-9d26-fb071dfeecbe")
+        == "codex"
+    )
     assert session_tool("ddf7fc98-6c93-40c8-9444-503d8a716dbf") == "claude"
 
 
 def test_read_messages_handles_codex_schema(tmp_path):
-    f = tmp_path / "rollout-2026-06-12T19-00-30-019ebc0c-9f4f-7362-9d26-fb071dfeecbe.jsonl"
+    f = (
+        tmp_path
+        / "rollout-2026-06-12T19-00-30-019ebc0c-9f4f-7362-9d26-fb071dfeecbe.jsonl"
+    )
     f.write_text(CODEX_ROLLOUT)
 
     out = ms._read_messages(f, "", 6)

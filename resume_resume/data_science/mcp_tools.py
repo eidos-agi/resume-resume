@@ -3,7 +3,6 @@
 Registers tools on the shared FastMCP instance from the parent mcp_server.
 """
 
-import json
 import time
 from pathlib import Path
 
@@ -73,13 +72,15 @@ def register_tools(mcp_instance):
         elif section == "fun_facts":
             return {"fun_facts": analytics.fun_facts(sessions)}
         else:
-            return {"error": f"Unknown section: {section}. Use: all, overview, temporal, projects, tools, models, records, predictions, personality, fun_facts"}
+            return {
+                "error": f"Unknown section: {section}. Use: all, overview, temporal, projects, tools, models, records, predictions, personality, fun_facts"
+            }
 
     @mcp_instance.tool()
     def session_xray(session_id: str) -> dict:
         """Deep x-ray of a single session — duration, tools, tokens, branches, everything."""
         from .scanner import _parse_single_session
-        from ..sessions import find_all_sessions, shorten_path
+        from ..sessions import find_all_sessions
 
         all_sessions = find_all_sessions()
         target = None
@@ -87,7 +88,9 @@ def register_tools(mcp_instance):
             if s["session_id"] == session_id:
                 home = str(Path.home())
                 project = s["project_dir"]
-                short = project.replace(home, "~") if project.startswith(home) else project
+                short = (
+                    project.replace(home, "~") if project.startswith(home) else project
+                )
                 parts = short.split("/")
                 target = {
                     "session_id": s["session_id"],
@@ -103,6 +106,7 @@ def register_tools(mcp_instance):
                     "file": str(s["file"]),
                 }
                 from datetime import datetime
+
                 dt = datetime.fromtimestamp(s["mtime"])
                 target["date"] = dt.strftime("%Y-%m-%d")
                 target["hour"] = dt.hour
@@ -130,6 +134,7 @@ def register_tools(mcp_instance):
         Returns the file path.
         """
         from .report import generate_report
+
         path = generate_report(output_path=output_path or None, org=org)
         return {"report": path, "note": f"Open {path} in your browser"}
 

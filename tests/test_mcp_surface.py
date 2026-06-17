@@ -33,13 +33,22 @@ async def client():
 # Dict-returning tools — assert key presence
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_self_insights_shape(client):
     r = await client.call_tool("self_insights", {"days": 1})
     d = r.data
     assert isinstance(d, dict)
-    for key in ("total_calls", "total_errors", "distinct_tools", "usage",
-                "dead_tools", "slow_tools", "error_prone_tools", "thresholds"):
+    for key in (
+        "total_calls",
+        "total_errors",
+        "distinct_tools",
+        "usage",
+        "dead_tools",
+        "slow_tools",
+        "error_prone_tools",
+        "thresholds",
+    ):
         assert key in d, f"self_insights missing key {key!r}"
 
 
@@ -65,34 +74,44 @@ async def test_self_a1_prompt_returns_string(client):
 @pytest.mark.asyncio
 async def test_self_process_decide_rejects_bad_id(client):
     from fastmcp.exceptions import ToolError
+
     with pytest.raises(ToolError, match="no proposal"):
-        await client.call_tool("self_process_decide", {
-            "proposal_id": "nonexistent",
-            "verdict": "approved",
-        })
+        await client.call_tool(
+            "self_process_decide",
+            {
+                "proposal_id": "nonexistent",
+                "verdict": "approved",
+            },
+        )
 
 
 @pytest.mark.asyncio
 async def test_self_a1_file_rejects_low_confidence(client):
-    r = await client.call_tool("self_a1_file", {
-        "type": "tune",
-        "title": "low conf test",
-        "evidence": "x",
-        "confidence": 0.1,
-    })
+    r = await client.call_tool(
+        "self_a1_file",
+        {
+            "type": "tune",
+            "title": "low conf test",
+            "evidence": "x",
+            "confidence": 0.1,
+        },
+    )
     d = r.data
     assert d.get("skipped") == "low_confidence"
 
 
 @pytest.mark.asyncio
 async def test_self_a2_file_rejects_invalid_target(client):
-    r = await client.call_tool("self_a2_file", {
-        "target": "invalid_target",
-        "change_type": "prompt_edit",
-        "title": "bad target test",
-        "evidence": "x",
-        "confidence": 0.9,
-    })
+    r = await client.call_tool(
+        "self_a2_file",
+        {
+            "target": "invalid_target",
+            "change_type": "prompt_edit",
+            "title": "bad target test",
+            "evidence": "x",
+            "confidence": 0.9,
+        },
+    )
     d = r.data
     assert d.get("skipped") == "invalid_target"
 
@@ -130,6 +149,7 @@ async def test_list_tool_returns_items_count(client, tool, args):
 # Core tools — basic smoke (not self_*, but critical path)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_self_a2_scorecard_shape(client):
     r = await client.call_tool("self_a2_scorecard", {"days": 90})
@@ -146,6 +166,7 @@ async def test_self_a2_scorecard_shape(client):
 # _extract_crash_context unit tests (TASK-0002)
 # ---------------------------------------------------------------------------
 
+
 def test_extract_crash_context_basic(tmp_path):
     """Extracts last user msg, assistant msg, tool use, and count."""
     import json as _json
@@ -153,22 +174,52 @@ def test_extract_crash_context_basic(tmp_path):
 
     session = tmp_path / "session.jsonl"
     lines = [
-        _json.dumps({"type": "human", "timestamp": "2026-04-16T10:00:00Z",
-                     "message": {"content": "fix the login bug"}}),
-        _json.dumps({"type": "assistant", "timestamp": "2026-04-16T10:01:00Z",
-                     "message": {"content": [
-                         {"type": "text", "text": "I'll look at the auth module."},
-                         {"type": "tool_use", "name": "Read",
-                          "input": {"file_path": "/src/auth.py"}},
-                     ]}}),
-        _json.dumps({"type": "human", "timestamp": "2026-04-16T10:05:00Z",
-                     "message": {"content": "now check the tests"}}),
-        _json.dumps({"type": "assistant", "timestamp": "2026-04-16T10:06:00Z",
-                     "message": {"content": [
-                         {"type": "tool_use", "name": "Bash",
-                          "input": {"command": "pytest tests/test_auth.py"}},
-                         {"type": "text", "text": "Running the auth tests now."},
-                     ]}}),
+        _json.dumps(
+            {
+                "type": "human",
+                "timestamp": "2026-04-16T10:00:00Z",
+                "message": {"content": "fix the login bug"},
+            }
+        ),
+        _json.dumps(
+            {
+                "type": "assistant",
+                "timestamp": "2026-04-16T10:01:00Z",
+                "message": {
+                    "content": [
+                        {"type": "text", "text": "I'll look at the auth module."},
+                        {
+                            "type": "tool_use",
+                            "name": "Read",
+                            "input": {"file_path": "/src/auth.py"},
+                        },
+                    ]
+                },
+            }
+        ),
+        _json.dumps(
+            {
+                "type": "human",
+                "timestamp": "2026-04-16T10:05:00Z",
+                "message": {"content": "now check the tests"},
+            }
+        ),
+        _json.dumps(
+            {
+                "type": "assistant",
+                "timestamp": "2026-04-16T10:06:00Z",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Bash",
+                            "input": {"command": "pytest tests/test_auth.py"},
+                        },
+                        {"type": "text", "text": "Running the auth tests now."},
+                    ]
+                },
+            }
+        ),
     ]
     session.write_text("\n".join(lines))
 
@@ -185,6 +236,7 @@ def test_extract_crash_context_empty_file(tmp_path):
     session = tmp_path / "empty.jsonl"
     session.write_text("")
     from resume_resume.mcp_server import _extract_crash_context
+
     ctx = _extract_crash_context(session)
     assert ctx["last_user_msg"] == ""
     assert ctx["message_count"] == 0
@@ -192,6 +244,7 @@ def test_extract_crash_context_empty_file(tmp_path):
 
 def test_extract_crash_context_missing_file(tmp_path):
     from resume_resume.mcp_server import _extract_crash_context
+
     ctx = _extract_crash_context(tmp_path / "nonexistent.jsonl")
     assert ctx["last_user_msg"] == ""
     assert ctx["message_count"] == 0
@@ -200,6 +253,7 @@ def test_extract_crash_context_missing_file(tmp_path):
 # ---------------------------------------------------------------------------
 # Core session tools — smoke tests (no side effects)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_search_sessions_returns_dict(client):
@@ -215,9 +269,9 @@ async def test_search_sessions_returns_dict(client):
 async def test_search_sessions_project_filter(client):
     """Project filter restricts results to matching projects."""
     # Search with a project that likely has no sessions matching "zzzznotaword"
-    r = await client.call_tool("search_sessions", {
-        "query": "session", "limit": 5, "project": "resume-resume"
-    })
+    r = await client.call_tool(
+        "search_sessions", {"query": "session", "limit": 5, "project": "resume-resume"}
+    )
     d = r.data
     assert isinstance(d, dict)
     assert "items" in d
@@ -232,9 +286,9 @@ async def test_search_sessions_project_filter(client):
 @pytest.mark.asyncio
 async def test_search_sessions_hours_filter(client):
     """Hours filter restricts to recent sessions."""
-    r = await client.call_tool("search_sessions", {
-        "query": "session", "limit": 5, "hours": 1
-    })
+    r = await client.call_tool(
+        "search_sessions", {"query": "session", "limit": 5, "hours": 1}
+    )
     d = r.data
     assert isinstance(d, dict)
     assert "items" in d
@@ -336,9 +390,8 @@ async def test_session_thread_with_bad_id(client):
 @pytest.mark.asyncio
 async def test_project_orient_shape(client):
     import os
-    r = await client.call_tool("project_orient", {
-        "project_path": os.getcwd()
-    })
+
+    r = await client.call_tool("project_orient", {"project_path": os.getcwd()})
     d = r.data
     assert isinstance(d, dict)
     assert "project" in d
@@ -382,7 +435,6 @@ async def test_my_week_has_focus_and_health(client):
 
 @pytest.mark.asyncio
 async def test_what_changed_shape(client):
-    import os
     r = await client.call_tool("what_changed", {"project": "resume", "hours": 48})
     d = r.data
     assert isinstance(d, dict)

@@ -7,9 +7,8 @@ Two tiers:
 
 import json
 import hashlib
-import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from ..sessions import find_all_sessions, RESUME_CACHE_DIR
@@ -38,20 +37,22 @@ def scan_all_sessions() -> list[dict]:
         parts = short.split("/")
         repo = parts[-1] if len(parts) > 1 else short
 
-        results.append({
-            "session_id": s["session_id"],
-            "project_dir": project,
-            "project_short": short,
-            "repo": repo,
-            "mtime": s["mtime"],
-            "size": s["size"],
-            "date": dt.strftime("%Y-%m-%d"),
-            "hour": dt.hour,
-            "weekday": dt.strftime("%A"),
-            "weekday_num": dt.weekday(),
-            "month": dt.strftime("%Y-%m"),
-            "file": str(s["file"]),
-        })
+        results.append(
+            {
+                "session_id": s["session_id"],
+                "project_dir": project,
+                "project_short": short,
+                "repo": repo,
+                "mtime": s["mtime"],
+                "size": s["size"],
+                "date": dt.strftime("%Y-%m-%d"),
+                "hour": dt.hour,
+                "weekday": dt.strftime("%A"),
+                "weekday_num": dt.weekday(),
+                "month": dt.strftime("%Y-%m"),
+                "file": str(s["file"]),
+            }
+        )
     return results
 
 
@@ -129,11 +130,16 @@ def _parse_single_session(s: dict) -> dict:
                             input_tokens += usage.get("input_tokens", 0)
                             output_tokens += usage.get("output_tokens", 0)
                             cache_read_tokens += usage.get("cache_read_input_tokens", 0)
-                            cache_write_tokens += usage.get("cache_creation_input_tokens", 0)
+                            cache_write_tokens += usage.get(
+                                "cache_creation_input_tokens", 0
+                            )
                         content = msg.get("content", [])
                         if isinstance(content, list):
                             for block in content:
-                                if isinstance(block, dict) and block.get("type") == "tool_use":
+                                if (
+                                    isinstance(block, dict)
+                                    and block.get("type") == "tool_use"
+                                ):
                                     name = block.get("name", "unknown")
                                     tool_uses[name] = tool_uses.get(name, 0) + 1
 
@@ -153,26 +159,28 @@ def _parse_single_session(s: dict) -> dict:
         first_ts = s["mtime"]
         last_ts = s["mtime"]
 
-    result.update({
-        "duration_secs": duration_secs,
-        "duration_mins": round(duration_secs / 60, 1),
-        "first_ts": first_ts,
-        "last_ts": last_ts,
-        "user_msgs": user_msgs,
-        "assistant_msgs": assistant_msgs,
-        "total_msgs": user_msgs + assistant_msgs,
-        "tool_uses": tool_uses,
-        "tool_use_total": sum(tool_uses.values()),
-        "models_used": models_used,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "cache_read_tokens": cache_read_tokens,
-        "cache_write_tokens": cache_write_tokens,
-        "total_tokens": input_tokens + output_tokens,
-        "git_branches": list(git_branches),
-        "progress_count": progress_count,
-        "subagent_heavy": progress_count > 100,
-    })
+    result.update(
+        {
+            "duration_secs": duration_secs,
+            "duration_mins": round(duration_secs / 60, 1),
+            "first_ts": first_ts,
+            "last_ts": last_ts,
+            "user_msgs": user_msgs,
+            "assistant_msgs": assistant_msgs,
+            "total_msgs": user_msgs + assistant_msgs,
+            "tool_uses": tool_uses,
+            "tool_use_total": sum(tool_uses.values()),
+            "models_used": models_used,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_read_tokens": cache_read_tokens,
+            "cache_write_tokens": cache_write_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "git_branches": list(git_branches),
+            "progress_count": progress_count,
+            "subagent_heavy": progress_count > 100,
+        }
+    )
     return result
 
 
@@ -187,6 +195,7 @@ def scan_history_jsonl() -> list[dict]:
         return []
 
     from collections import defaultdict
+
     # Group by (project, date)
     groups = defaultdict(list)
     try:
@@ -204,11 +213,13 @@ def scan_history_jsonl() -> list[dict]:
                 project = entry.get("project", "")
                 dt = datetime.fromtimestamp(ts)
                 key = (project, dt.strftime("%Y-%m-%d"))
-                groups[key].append({
-                    "ts": ts,
-                    "hour": dt.hour,
-                    "text": entry.get("display", ""),
-                })
+                groups[key].append(
+                    {
+                        "ts": ts,
+                        "hour": dt.hour,
+                        "text": entry.get("display", ""),
+                    }
+                )
     except OSError:
         return []
 
@@ -229,38 +240,40 @@ def scan_history_jsonl() -> list[dict]:
         est_input_tokens = total_chars // 4
         est_output_tokens = est_input_tokens * 2  # rough 2x response
 
-        results.append({
-            "session_id": f"history-{date}-{repo}",
-            "project_short": short,
-            "project_dir": project,
-            "repo": repo,
-            "size": 0,
-            "mtime": last_ts,
-            "date": date,
-            "hour": dt.hour,
-            "weekday": dt.strftime("%A"),
-            "weekday_num": dt.weekday(),
-            "month": dt.strftime("%Y-%m"),
-            "duration_secs": last_ts - first_ts,
-            "duration_mins": round((last_ts - first_ts) / 60, 1),
-            "first_ts": first_ts,
-            "last_ts": last_ts,
-            "user_msgs": len(entries),
-            "assistant_msgs": len(entries),  # assume 1:1
-            "total_msgs": len(entries) * 2,
-            "tool_uses": {},
-            "tool_use_total": 0,
-            "models_used": {},
-            "input_tokens": est_input_tokens,
-            "output_tokens": est_output_tokens,
-            "cache_read_tokens": 0,
-            "cache_write_tokens": 0,
-            "total_tokens": est_input_tokens + est_output_tokens,
-            "git_branches": [],
-            "progress_count": 0,
-            "subagent_heavy": False,
-            "_source": "history",
-        })
+        results.append(
+            {
+                "session_id": f"history-{date}-{repo}",
+                "project_short": short,
+                "project_dir": project,
+                "repo": repo,
+                "size": 0,
+                "mtime": last_ts,
+                "date": date,
+                "hour": dt.hour,
+                "weekday": dt.strftime("%A"),
+                "weekday_num": dt.weekday(),
+                "month": dt.strftime("%Y-%m"),
+                "duration_secs": last_ts - first_ts,
+                "duration_mins": round((last_ts - first_ts) / 60, 1),
+                "first_ts": first_ts,
+                "last_ts": last_ts,
+                "user_msgs": len(entries),
+                "assistant_msgs": len(entries),  # assume 1:1
+                "total_msgs": len(entries) * 2,
+                "tool_uses": {},
+                "tool_use_total": 0,
+                "models_used": {},
+                "input_tokens": est_input_tokens,
+                "output_tokens": est_output_tokens,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "total_tokens": est_input_tokens + est_output_tokens,
+                "git_branches": [],
+                "progress_count": 0,
+                "subagent_heavy": False,
+                "_source": "history",
+            }
+        )
 
     return results
 

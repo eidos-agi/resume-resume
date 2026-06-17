@@ -55,6 +55,7 @@ async def client():
 # dirty_repos — perf-001
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_dirty_repos_cached_is_dramatically_faster_than_cold(client):
     """perf-001a: the 30s TTL cache must give a near-instant second call.
@@ -65,11 +66,15 @@ async def test_dirty_repos_cached_is_dramatically_faster_than_cold(client):
     _bust_dirty_repos_cache()
     cold_ms = await _time_call(client, "dirty_repos", {})
     cached_ms = await _time_call(client, "dirty_repos", {})
-    assert cold_ms > 50, f"cold path suspiciously fast ({cold_ms:.0f}ms) — is scan short-circuiting?"
-    assert cached_ms < 50, f"cached path too slow ({cached_ms:.0f}ms) — is cache working?"
+    assert cold_ms > 50, (
+        f"cold path suspiciously fast ({cold_ms:.0f}ms) — is scan short-circuiting?"
+    )
+    assert cached_ms < 50, (
+        f"cached path too slow ({cached_ms:.0f}ms) — is cache working?"
+    )
     assert cold_ms / cached_ms >= 20, (
         f"cache speedup insufficient: cold={cold_ms:.0f}ms cached={cached_ms:.0f}ms "
-        f"ratio={cold_ms/cached_ms:.1f}x (expected >=20x)"
+        f"ratio={cold_ms / cached_ms:.1f}x (expected >=20x)"
     )
 
 
@@ -103,6 +108,7 @@ async def test_dirty_repos_cache_reports_cached_flag(client):
 # self_* response-shape normalization — correctness-002
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_self_list_tools_return_wrapped_dict(client):
     """correctness-002: list-returning self_* tools must return
@@ -121,7 +127,9 @@ async def test_self_list_tools_return_wrapped_dict(client):
     for tool, args in list_tools:
         result = await client.call_tool(tool, args)
         data = result.data
-        assert isinstance(data, dict), f"{tool} returned {type(data).__name__}, expected dict"
+        assert isinstance(data, dict), (
+            f"{tool} returned {type(data).__name__}, expected dict"
+        )
         assert "items" in data, f"{tool} missing 'items' key: {list(data.keys())}"
         assert "count" in data, f"{tool} missing 'count' key: {list(data.keys())}"
         assert isinstance(data["items"], list), f"{tool}['items'] is not a list"
@@ -131,6 +139,7 @@ async def test_self_list_tools_return_wrapped_dict(client):
 # ---------------------------------------------------------------------------
 # self_insights — perf-003
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_self_insights_fast(client):
@@ -154,6 +163,7 @@ async def test_self_insights_fast(client):
 # recent_sessions — perf-004 (currently slow, no fix shipped yet)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_recent_sessions_cached_is_fast(client):
     """perf-002: recent_sessions cache. Uses relative assertion (cached
@@ -165,7 +175,7 @@ async def test_recent_sessions_cached_is_fast(client):
     if first > 500:  # only assert ratio when cold is meaningfully slow
         assert cached_ms < first / 5, (
             f"recent_sessions cache not helping: cold={first:.0f}ms "
-            f"cached={cached_ms:.0f}ms ratio={first/cached_ms:.1f}x"
+            f"cached={cached_ms:.0f}ms ratio={first / cached_ms:.1f}x"
         )
     # Absolute ceiling — generous because upstream find_all_sessions is
     # I/O-bound and can take 20s+ under heavy system load. The cache
@@ -210,13 +220,15 @@ def test_obs001_dead_tools_suppressed_below_min_volume(tmp_path, monkeypatch):
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     (tmp_path / f"{day}.jsonl").write_text(
         "\n".join(
-            _json.dumps({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "tool": f"tool_{i % 5}",
-                "duration_ms": 10.0,
-                "status": "ok",
-                "result": None,
-            })
+            _json.dumps(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "tool": f"tool_{i % 5}",
+                    "duration_ms": 10.0,
+                    "status": "ok",
+                    "result": None,
+                }
+            )
             for i in range(50)
         )
     )
@@ -238,14 +250,28 @@ def test_obs001_dead_tools_shown_above_min_volume(tmp_path, monkeypatch):
     lines = []
     # 199 calls to "hog", 1 call to "rare" — rare should be flagged dead
     for _ in range(199):
-        lines.append(_json.dumps({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "tool": "hog", "duration_ms": 5.0, "status": "ok", "result": None,
-        }))
-    lines.append(_json.dumps({
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "tool": "rare", "duration_ms": 5.0, "status": "ok", "result": None,
-    }))
+        lines.append(
+            _json.dumps(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "tool": "hog",
+                    "duration_ms": 5.0,
+                    "status": "ok",
+                    "result": None,
+                }
+            )
+        )
+    lines.append(
+        _json.dumps(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "tool": "rare",
+                "duration_ms": 5.0,
+                "status": "ok",
+                "result": None,
+            }
+        )
+    )
     (tmp_path / f"{day}.jsonl").write_text("\n".join(lines))
 
     r = tq.insights_report(days=1, root=tmp_path)
