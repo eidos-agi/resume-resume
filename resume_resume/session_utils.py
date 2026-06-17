@@ -11,6 +11,38 @@ from datetime import datetime
 from pathlib import Path
 
 
+def resume_command(
+    session_id: str,
+    *,
+    fork: bool = False,
+    skip_permissions: bool = False,
+) -> str:
+    """Build the CLI command to resume (or fork) a session, by source.
+
+    Claude Code → ``claude --resume <id>`` (``--fork-session`` to fork).
+    Codex CLI   → ``codex resume <uuid>`` (``codex fork <uuid>`` to fork),
+    where the UUID is extracted from the rollout filename stem.
+
+    ``skip_permissions`` only applies to Claude Code; Codex has no equivalent
+    flag and ignores it.
+    """
+    from claude_session_commons.codex import (
+        codex_session_uuid,
+        is_codex_session_id,
+    )
+
+    if is_codex_session_id(session_id):
+        verb = "fork" if fork else "resume"
+        return f"codex {verb} {codex_session_uuid(session_id)}"
+
+    cmd = f"claude --resume {session_id}"
+    if fork:
+        cmd += " --fork-session"
+    if skip_permissions:
+        cmd += " --dangerously-skip-permissions"
+    return cmd
+
+
 def filter_automated(sessions: list[dict], cache_index: dict) -> list[dict]:
     """Remove sessions classified as 'automated' by the ML classifier.
 

@@ -28,6 +28,7 @@ from .sessions import (
     PROJECTS_DIR,
 )
 from claude_session_commons import decode_project_path
+from claude_session_commons.codex import CODEX_SESSIONS_DIR, _read_codex_cwd, session_tool
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
 from .progress import progress
 from .search_index import HOT_WINDOW_SECONDS
@@ -42,6 +43,10 @@ _cache = SessionCache()
 
 _TRUNC = 300  # max chars per message/field
 _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+# Codex CLI session ids look like rollout-<ISO-ts>-<uuid>. Accept those too.
+# Kept strict (only word chars, hyphens, colons) to preserve glob-injection
+# safety — no '*', '?', '[', ']', or path separators can reach a glob pattern.
+_CODEX_ID_RE = re.compile(r"rollout-[0-9A-Za-z:\-]+")
 
 # Cached wrapper for find_all_sessions — the shared bottleneck across
 # search_sessions, dirty_repos, and boot_up. Each call scans the filesystem
@@ -135,6 +140,30 @@ def _hot_sessions(window_seconds: int = HOT_WINDOW_SECONDS) -> list[dict]:
     return sessions
 
 
+# ponytail: 6h freshness window. A session newer than the 30-min hot window but
+# not yet in the daemon's append-only SessionIndex (and therefore not in the
+# cold FTS index either) is invisible to both search tiers — the gap that hid
+# the same-day "nevereatalone" codex session. _fresh_sessions closes it with a
+# real filesystem scan (the cached find_all_sessions, which DOES discover
+# ~/.codex/sessions), capped so the supplemental live scan stays bounded.
+_FRESH_WINDOW_SECONDS = 6 * 60 * 60
+
+
+def _fresh_sessions(cutoff_after: float = 0.0) -> list[dict]:
+    """Recently-modified sessions from the filesystem, regardless of index state.
+
+    Catches sessions written but not yet appended to SessionIndex / ingested
+    into the cold index. Bounded by _FRESH_WINDOW_SECONDS and capped at 200 so
+    a search never turns into an unbounded scan of every fresh file.
+    """
+    floor = time.time() - _FRESH_WINDOW_SECONDS
+    if cutoff_after:
+        floor = max(floor, cutoff_after)
+    fresh = [s for s in _find_all_sessions_cached() if s["mtime"] >= floor]
+    fresh.sort(key=lambda s: s["mtime"], reverse=True)
+    return fresh[:200]  # ponytail: cap supplemental scan
+
+
 def _summary_valid(summary: dict) -> bool:
     """Reject cached summaries that are garbage (XML blobs, fragments, etc.)."""
     if not isinstance(summary, dict):
@@ -156,19 +185,37 @@ def _summary_valid(summary: dict) -> bool:
 
 
 def _find_session(session_id: str) -> dict | None:
-    """Find a session by targeted glob — O(1) dirs, not O(N) sessions."""
-    # Validate UUID format to prevent glob injection (* ? [] etc)
-    if not _UUID_RE.fullmatch(session_id):
+    """Find a session by targeted glob — O(dirs), not O(N) sessions.
+
+    Resolves both Claude-Code sessions (~/.claude/projects/*/<uuid>.jsonl)
+    and Codex CLI sessions (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl).
+    The codex tree is date-partitioned, so a recursive glob on the id stays
+    O(date dirs) rather than scanning every session file.
+    """
+    is_codex = bool(_CODEX_ID_RE.fullmatch(session_id))
+    # Validate id format to prevent glob injection (* ? [] / etc). Only bare
+    # UUIDs or rollout-* ids reach a glob pattern.
+    if not is_codex and not _UUID_RE.fullmatch(session_id):
         return None
-    matches = list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl"))
+
+    if is_codex:
+        matches = list(CODEX_SESSIONS_DIR.glob(f"**/{session_id}.jsonl"))
+    else:
+        matches = list(PROJECTS_DIR.glob(f"*/{session_id}.jsonl"))
     if not matches:
         return None
     f = matches[0]
     stat = f.stat()
+    if is_codex:
+        # Match how scan_codex_sessions labels project_dir: the cwd recorded
+        # in the line-1 session_meta payload.
+        project_dir = _read_codex_cwd(f)
+    else:
+        project_dir = decode_project_path(f.parent.name)
     return {
         "file": f,
         "session_id": session_id,
-        "project_dir": decode_project_path(f.parent.name),
+        "project_dir": project_dir,
         "mtime": stat.st_mtime,
         "size": stat.st_size,
     }
@@ -216,6 +263,7 @@ def _get_title(session_id: str, session_file: Path) -> str:
     return summary.get("title", "") if isinstance(summary, dict) else ""
 
 
+from .session_utils import resume_command
 from .session_utils import session_duration_hours as _session_duration_hours
 
 
@@ -437,8 +485,17 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
     if hours > 0:
         cutoff = now - hours * 3600
 
-    # Hot path: only sessions touched in the last 30 minutes are scanned live.
-    hot_sessions = _hot_sessions()
+    # Hot path: sessions touched in the last 30 minutes are scanned live. We
+    # also fold in fresh-but-unindexed sessions (newer than the hot window but
+    # not yet in the daemon index or cold FTS) so same-day sessions are never
+    # invisible while waiting for a background ingestion pass.
+    hot_sessions = list(_hot_sessions())
+    seen_ids = {s["session_id"] for s in hot_sessions}
+    for s in _fresh_sessions(cutoff_after=cutoff):
+        if s["session_id"] not in seen_ids:
+            hot_sessions.append(s)
+            seen_ids.add(s["session_id"])
+
     if cutoff:
         hot_sessions = [s for s in hot_sessions if s["mtime"] >= cutoff]
 
@@ -505,8 +562,14 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
             project=project,
         )
 
+    # The live scan now reaches back further than the cold cutoff, so a fresh
+    # session can surface in both tiers. Prefer the hot-live hit and drop the
+    # cold duplicate.
+    hot_ids = {r["id"] for r in hot_results}
     cold_results = []
     for row in cold_rows:
+        if row["session_id"] in hot_ids:
+            continue
         cold_results.append({
             "id": row["session_id"],
             "project": shorten_path(row.get("project_dir") or ""),
@@ -520,6 +583,8 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
         })
 
     results = hot_results + cold_results
+    for item in results:
+        item["tool"] = session_tool(item["id"])  # "claude" | "codex"
 
     p.update(f"{len(hot_results)} hot + {len(cold_results)} indexed results", icon="done")
 
@@ -572,7 +637,7 @@ def read_session(
     limit = max(1, min(limit, 30))
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     result = _read_messages(session["file"], keyword, limit)
     result["id"] = session_id
@@ -600,6 +665,26 @@ def _read_messages(session_file: Path, keyword: str, limit: int) -> dict:
                 if not isinstance(entry, dict):
                     continue
                 entry_type = entry.get("type")
+
+                # Codex schema: event_msg with payload.{user_message,agent_message}.
+                # Map to the same {role, text} shape as Claude user/assistant entries
+                # so cross-tool merge_context works on Codex sessions too.
+                if entry_type == "event_msg":
+                    payload = entry.get("payload") or {}
+                    ptype = payload.get("type")
+                    if ptype == "user_message":
+                        role, content = "user", payload.get("message", "")
+                    elif ptype == "agent_message":
+                        role, content = "assistant", payload.get("message", "")
+                    else:
+                        continue
+                    if not isinstance(content, str) or not content.strip():
+                        continue
+                    if keyword_lower and keyword_lower not in content.lower():
+                        continue
+                    messages.append({"role": role, "text": _trunc(content)})
+                    continue
+
                 if entry_type not in ("user", "assistant"):
                     continue
 
@@ -719,7 +804,7 @@ def session_summary(session_id: str, force_regenerate: bool = False,
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     session_file = session["file"]
     ck = _cache.cache_key(session_file)
@@ -1420,14 +1505,12 @@ def resume_in_terminal(session_id: str, fork: bool = False) -> dict:
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     project_dir = session["project_dir"]
     title = _get_title(session_id, session["file"]) or project_dir
 
-    cmd = f"claude --resume {session_id}"
-    if fork:
-        cmd += " --fork-session"
+    cmd = resume_command(session_id, fork=fork)
 
     err = _launch_terminal(project_dir, cmd)
     if err:
@@ -1464,7 +1547,7 @@ def merge_context(
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     message_limit = max(2, min(message_limit, 20))
     project = shorten_path(session["project_dir"])
@@ -1624,7 +1707,7 @@ def session_timeline(
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     limit = max(10, min(limit, 200))
     needs_full_scan = focus == "even" or after or before
@@ -1882,7 +1965,7 @@ def session_thread(session_id: str) -> dict:
     """
     session = _find_session(session_id)
     if session is None:
-        return {"error": f"Session {session_id[:36]} not found"}
+        return {"error": f"Session {session_id} not found"}
 
     bookmarks_dir = Path.home() / ".claude" / "bookmarks"
     all_bookmarks = {}
