@@ -643,27 +643,88 @@ def _paste_box_or_fallthrough():
         return
 
     # 2) Pasted chat text -> resume-resume's whole point: find the session that
-    #    matches the most of this text, then open it. Same hit-count ranking the
-    #    MCP search uses (total term occurrences, most-matched wins).
-    from .mcp_server import search_sessions
-    search = getattr(search_sessions, "fn", search_sessions)
-    items = search(line, limit=1, include_automated=True).get("items", [])
-    if not items:
-        return  # nothing matched -> fall through to the normal picker
-    top = items[0]
-    # Confidence gate: a real paste is a high-coverage, in-order subsequence of
-    # its source. Verify before auto-opening, so shared-keyword false positives
-    # drop to the list instead of launching the wrong session.
-    cov = _paste_coverage(line, _session_raw(top["id"]))
-    if cov < 0.5:
-        print(f"  \033[33m~ best match only {cov:.0%} in-order — opening the list\033[0m")
+    #    matches the most of this text, then open it. Full-text raw scan of every
+    #    session file — the summary/FTS index only covers titles+summaries, so
+    #    pasted transcript text from an OLD session would never be retrieved.
+    _plog(f"PASTE {len(line)} chars: {line[:160]!r}")
+    print("  \033[90m🔎 scanning your sessions…\033[0m", flush=True)
+    cands = _scan_candidates(line)
+    _plog(f"scan -> {[(s[:8], round(c, 2)) for s, _, c in cands]}")
+    for sid, path, cov in cands:
+        proj = os.path.basename(os.path.dirname(path))
+        print(f"  \033[90m· {proj[:40]} [{sid[:8]}]: {cov:.0%}\033[0m")
+
+    # Threshold 0.25 (calibrated): a 180-trial sweep put decoy scores at 0.00
+    # max, so precision stays 1.0 well below here; 0.25 recovers recall on
+    # partial/paraphrased pastes that 0.3 dropped, at no false-positive cost.
+    if not cands or cands[0][2] < 0.25:
+        best = f"{cands[0][2]:.0%}" if cands else "0%"
+        print(f"  \033[33m~ best only {best} matched — opening the list\033[0m")
+        _plog(f"best {best} < 0.25 -> list")
         return
-    print(f"  \033[32m✓ Best match\033[0m ({cov:.0%} in-order, {top.get('hits') or '?'} hits): "
-          f"\033[1m{top.get('title') or top['id']}\033[0m")
-    _resume_from_paste([top["id"]])  # execs
+    top_sid, top_path, cov = cands[0]
+    proj = os.path.basename(os.path.dirname(top_path))
+    print(f"  \033[32m✓ Best match\033[0m ({cov:.0%}): \033[1m{proj}\033[0m")
+    _plog(f"OPEN {top_sid} cov={cov:.2f}")
+    _resume_from_paste([top_sid])  # execs
+
+
+def _scan_candidates(paste: str, limit: int = 6):
+    """Full-text raw scan of every session file for `paste`. Returns the best
+    [(session_id, path, coverage)] by in-order coverage.
+
+    The FTS/summary index only holds titles + summaries, so pasted transcript
+    text from an old session isn't retrievable through it — only a raw scan
+    finds it. A cheap pre-filter (longest paste word must appear as a raw
+    substring) skips files that can't match, so we only pay full normalization
+    on plausible hits. Skips the launching session (CLAUDE_CODE_SESSION_ID).
+    ponytail: O(all-session-bytes) per paste; ~hundreds of MB scans in a few
+    seconds. If the corpus grows huge, gate behind a fast index pre-pass."""
+    import glob
+    from concurrent.futures import ThreadPoolExecutor
+
+    words = _normalize_ws(paste).split()
+    anchor = max(words, key=len) if words else ""
+    if not anchor:
+        return []
+    self_sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    files = glob.glob(os.path.expanduser("~/.claude/projects/**/*.jsonl"), recursive=True)
+
+    def score(f: str):
+        sid = os.path.basename(f)[:-6]  # strip .jsonl
+        if sid == self_sid:
+            return None
+        try:
+            raw = open(f, encoding="utf-8", errors="replace").read()
+        except OSError:
+            return None
+        if anchor not in raw.lower():  # cheap skip before full normalization
+            return None
+        cov = _paste_coverage(paste, raw)
+        return (sid, f, cov) if cov > 0 else None
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        out = [r for r in pool.map(score, files) if r]
+    out.sort(key=lambda r: r[2], reverse=True)
+    return out[:limit]
+
+
+PASTE_LOG = Path.home() / ".claude-resume-duet" / "cr-paste.log"
+
+
+def _plog(msg: str) -> None:
+    """Append a line to the paste-resolution debug log (best-effort, sync)."""
+    try:
+        from datetime import datetime
+        PASTE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(PASTE_LOG, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat(timespec='seconds')} {msg}\n")
+    except OSError:
+        pass
 
 
 BRACKET_PASTE = re.compile(r"\x1b\[20[01]~")  # ESC[200~ … ESC[201~ paste frame
+ANSI_SEQ = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")  # any other copied escape code
 
 
 def _read_paste() -> str:
@@ -698,45 +759,41 @@ def _read_paste() -> str:
         sys.stdout.flush()
 
     text = first + ("\n" + "".join(rest) if rest else "")
-    return BRACKET_PASTE.sub("", text).strip()
+    # Tolerate junk a terminal copy drags in: paste frame, other escape codes,
+    # and stray control chars. Keep printable text, newlines, and tabs.
+    text = BRACKET_PASTE.sub("", text)
+    text = ANSI_SEQ.sub("", text)
+    text = "".join(ch for ch in text if ch >= " " or ch in "\n\t")
+    return text.strip()
 
 
 def _normalize_ws(s: str) -> str:
-    """Drop newlines (real and JSON-escaped) and collapse whitespace, so a
-    terminal-wrapped paste compares cleanly against the session's stored text."""
-    s = s.replace("\\r\\n", " ").replace("\\n", " ").replace("\\t", " ")
-    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
-    return re.sub(r"\s+", " ", s).strip().lower()
+    """Lowercase and reduce ALL non-alphanumeric runs to single spaces, so a
+    paste matches the session through markdown (**bold**), smart quotes,
+    em-dashes (—), escaped \\" and \\n, and terminal wrapping. Only letters,
+    digits, and word order survive — maximal tolerance of incorrect characters.
+    Strip JSON-escaped newlines first so '\\n' doesn't leave a stray 'n'."""
+    s = s.replace("\\r\\n", " ").replace("\\n", " ").replace("\\t", " ").replace("\\r", " ")
+    s = re.sub(r"[^a-z0-9]+", " ", s.lower())
+    return re.sub(r"\s+", " ", s).strip()
 
 
-def _paste_coverage(paste: str, session_text: str) -> float:
-    """Fraction of `paste` that appears IN ORDER in `session_text` — stdlib
-    difflib matching blocks / length, after whitespace-normalizing both sides.
-    A genuine paste scores high; coincidental keyword overlap scores low.
-    ponytail: window the haystack around the paste so difflib stays cheap on
-    multi-MB session files."""
-    import difflib
-    a = _normalize_ws(paste)
+def _paste_coverage(paste: str, session_text: str, n: int = 5) -> float:
+    """Fraction of the paste's contiguous word-chunks that appear verbatim in
+    `session_text`. Each chunk is `n` words IN ORDER, so this still rewards real
+    pasted text and rejects coincidental keyword overlap — but unlike one
+    difflib window it tolerates a paste whose lines are SCATTERED across the
+    session (a recap pulling from many points). Whitespace-normalized both
+    sides. ponytail: verbatim n-gram containment; a few bad chars only cost the
+    chunks they fall in, not the whole score."""
+    a = _normalize_ws(paste).split()
     b = _normalize_ws(session_text)
     if not a or not b:
         return 0.0
-    i = b.find(a[:40])
-    if i >= 0:
-        lo = max(0, i - len(a))
-        b = b[lo: lo + 4 * len(a)]
-    elif len(b) > 8 * len(a):
-        b = b[: 8 * len(a)]
-    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
-    return sum(k.size for k in sm.get_matching_blocks()) / len(a)
-
-
-def _session_raw(session_id: str) -> str:
-    """Raw .jsonl text for a session id (empty string if not on disk)."""
-    import glob
-    hits = glob.glob(
-        os.path.expanduser(f"~/.claude/projects/**/{session_id}.jsonl"), recursive=True
-    )
-    return open(hits[0], encoding="utf-8", errors="replace").read() if hits else ""
+    if len(a) < n:
+        return 1.0 if " ".join(a) in b else 0.0
+    chunks = [" ".join(a[i: i + n]) for i in range(0, len(a) - n + 1, n)]
+    return sum(1 for c in chunks if c in b) / len(chunks)
 
 
 def main():
