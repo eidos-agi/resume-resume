@@ -13,14 +13,11 @@ Improvements over v1:
 Output: serialized model + feature config at resume_resume/classifier.pkl
 """
 
-import json
-import math
 import sys
 import os
 import time
 import pickle
 from pathlib import Path
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 
@@ -33,12 +30,15 @@ from sklearn.metrics import classification_report
 from sklearn.tree import DecisionTreeClassifier, export_text
 
 from resume_resume.sessions import (
-    find_all_sessions, classify_session, quick_scan,
-    PROJECTS_DIR, MIN_SESSION_BYTES,
+    classify_session,
+    quick_scan,
+    PROJECTS_DIR,
+    MIN_SESSION_BYTES,
 )
 
 
 # ── Session discovery (expanded) ───────────────────────────────
+
 
 def find_all_sessions_expanded() -> list[dict]:
     """Find ALL .jsonl files including subagent sessions.
@@ -57,12 +57,14 @@ def find_all_sessions_expanded() -> list[dict]:
             stat = jsonl_file.stat()
             if stat.st_size < MIN_SESSION_BYTES:
                 continue
-            sessions.append({
-                "file": jsonl_file,
-                "session_id": jsonl_file.stem,
-                "size": stat.st_size,
-                "source": "main",
-            })
+            sessions.append(
+                {
+                    "file": jsonl_file,
+                    "session_id": jsonl_file.stem,
+                    "size": stat.st_size,
+                    "source": "main",
+                }
+            )
         for session_dir in project_dir.iterdir():
             if not session_dir.is_dir():
                 continue
@@ -72,12 +74,14 @@ def find_all_sessions_expanded() -> list[dict]:
                     stat = jsonl_file.stat()
                     if stat.st_size < MIN_SESSION_BYTES:
                         continue
-                    sessions.append({
-                        "file": jsonl_file,
-                        "session_id": jsonl_file.stem,
-                        "size": stat.st_size,
-                        "source": "subagent",
-                    })
+                    sessions.append(
+                        {
+                            "file": jsonl_file,
+                            "session_id": jsonl_file.stem,
+                            "size": stat.st_size,
+                            "source": "subagent",
+                        }
+                    )
 
     return sessions
 
@@ -88,20 +92,37 @@ def find_all_sessions_expanded() -> list[dict]:
 # Added:   log_duration, empty_msg_ratio, first_is_prompt
 
 FEATURE_COLS = [
-    "user_messages", "assistant_messages", "tool_uses", "tool_results",
-    "system_entries", "progress_entries", "summary_entries",
+    "user_messages",
+    "assistant_messages",
+    "tool_uses",
+    "tool_results",
+    "system_entries",
+    "progress_entries",
+    "summary_entries",
     "file_size",
-    "duration_secs", "log_duration", "secs_per_turn", "msgs_per_minute",
-    "tool_to_user_ratio", "question_ratio", "politeness_ratio",
-    "avg_user_chars", "user_code_blocks",
-    "avg_assistant_chars", "assistant_code_blocks",
-    "casual_ratio", "no_caps_ratio", "short_msg_ratio",
-    "exclamation_ratio", "typo_score",
-    "empty_msg_ratio", "first_is_prompt",
+    "duration_secs",
+    "log_duration",
+    "secs_per_turn",
+    "msgs_per_minute",
+    "tool_to_user_ratio",
+    "question_ratio",
+    "politeness_ratio",
+    "avg_user_chars",
+    "user_code_blocks",
+    "avg_assistant_chars",
+    "assistant_code_blocks",
+    "casual_ratio",
+    "no_caps_ratio",
+    "short_msg_ratio",
+    "exclamation_ratio",
+    "typo_score",
+    "empty_msg_ratio",
+    "first_is_prompt",
 ]
 
 
 # ── Obvious-example filter ─────────────────────────────────────
+
 
 def is_obvious(row) -> bool:
     """High-confidence label filter. Only train on these."""
@@ -137,9 +158,11 @@ def is_obvious(row) -> bool:
 
 # ── VIF analysis ───────────────────────────────────────────────
 
+
 def compute_vif(df, cols):
     """Compute Variance Inflation Factor for each feature."""
     from sklearn.linear_model import LinearRegression
+
     vifs = {}
     X = df[cols].values
     for i, col in enumerate(cols):
@@ -153,6 +176,7 @@ def compute_vif(df, cols):
 
 
 # ── Main ───────────────────────────────────────────────────────
+
 
 def main():
     print("\n  Discovering all sessions (including subagents)...")
@@ -179,20 +203,20 @@ def main():
         except Exception:
             pass
         if (i + 1) % 500 == 0:
-            print(f"    {i+1}/{len(sessions)}...")
+            print(f"    {i + 1}/{len(sessions)}...")
 
     elapsed = time.time() - t0
     print(f"  Extracted {len(rows)} sessions in {elapsed:.1f}s\n")
 
     df = pd.DataFrame(rows)
     print(f"  All sessions: {df['label'].value_counts().to_dict()}")
-    print(f"  By source:")
+    print("  By source:")
     for src in ["main", "subagent"]:
         sub = df[df["source"] == src]
         print(f"    {src}: {len(sub)} — {sub['label'].value_counts().to_dict()}")
 
     # ── VIF analysis ─────────────────────────────────────────
-    print(f"\n  ── VIF Analysis (multicollinearity check) ──\n")
+    print("\n  ── VIF Analysis (multicollinearity check) ──\n")
     vifs = compute_vif(df, FEATURE_COLS)
     for col, vif in sorted(vifs.items(), key=lambda x: -x[1]):
         flag = " ⚠️  HIGH" if vif > 10 else ""
@@ -208,7 +232,9 @@ def main():
     df_train = pd.concat([df_train_sub, df_train_main], ignore_index=True)
     df_ambiguous = df[main_mask & ~obvious_mask].copy()
 
-    print(f"\n  Training set: {len(df_train)} — {df_train['label'].value_counts().to_dict()}")
+    print(
+        f"\n  Training set: {len(df_train)} — {df_train['label'].value_counts().to_dict()}"
+    )
     print(f"    Subagent (ground truth): {len(df_train_sub)}")
     print(f"    Main (obvious): {len(df_train_main)}")
     print(f"  Ambiguous (held out): {len(df_ambiguous)}\n")
@@ -222,8 +248,12 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         X_labeled, y_labeled, test_size=0.2, stratify=y_labeled, random_state=42
     )
-    print(f"  Train: {len(X_train)} ({np.sum(y_train==1)} interactive, {np.sum(y_train==0)} automated)")
-    print(f"  Test:  {len(X_test)} ({np.sum(y_test==1)} interactive, {np.sum(y_test==0)} automated)\n")
+    print(
+        f"  Train: {len(X_train)} ({np.sum(y_train == 1)} interactive, {np.sum(y_train == 0)} automated)"
+    )
+    print(
+        f"  Test:  {len(X_test)} ({np.sum(y_test == 1)} interactive, {np.sum(y_test == 0)} automated)\n"
+    )
 
     # ── Cross-validation ─────────────────────────────────────
     print("  5-fold stratified CV on training set:\n")
@@ -231,7 +261,9 @@ def main():
 
     models = {
         "Decision Tree (d=5)": DecisionTreeClassifier(max_depth=5, random_state=42),
-        "Gradient Boosting":   GradientBoostingClassifier(n_estimators=100, max_depth=4, random_state=42),
+        "Gradient Boosting": GradientBoostingClassifier(
+            n_estimators=100, max_depth=4, random_state=42
+        ),
     }
     for name, model in models.items():
         scores = cross_val_score(model, X_train, y_train, cv=cv, scoring="accuracy")
@@ -245,7 +277,11 @@ def main():
     # Evaluate raw model on test set
     y_test_pred = gb_raw.predict(X_test)
     print("  ── TEST SET (raw model) ──\n")
-    print(classification_report(y_test, y_test_pred, target_names=["automated", "interactive"], digits=3))
+    print(
+        classification_report(
+            y_test, y_test_pred, target_names=["automated", "interactive"], digits=3
+        )
+    )
 
     # Calibrate probabilities using isotonic regression on test set
     print("  ── Calibrating probabilities (isotonic regression) ──\n")
@@ -255,7 +291,7 @@ def main():
     # Check calibration quality
     cal_proba = gb_calibrated.predict_proba(X_all)
     cal_confs = cal_proba.max(axis=1)
-    print(f"  Calibrated confidence distribution:")
+    print("  Calibrated confidence distribution:")
     print(f"    Min:    {cal_confs.min():.4f}")
     print(f"    25th:   {np.percentile(cal_confs, 25):.4f}")
     print(f"    Median: {np.median(cal_confs):.4f}")
@@ -283,8 +319,12 @@ def main():
     y_proba = gb_calibrated.predict_proba(X_all)
 
     print("  ── All-sessions predictions ──\n")
-    print(f"  ML:        {np.sum(y_ml==1)} interactive, {np.sum(y_ml==0)} automated")
-    print(f"  Heuristic: {np.sum(y_all==1)} interactive, {np.sum(y_all==0)} automated")
+    print(
+        f"  ML:        {np.sum(y_ml == 1)} interactive, {np.sum(y_ml == 0)} automated"
+    )
+    print(
+        f"  Heuristic: {np.sum(y_all == 1)} interactive, {np.sum(y_all == 0)} automated"
+    )
 
     # ── Ensemble with calibrated confidence ──────────────────
     ensemble = []
@@ -310,17 +350,23 @@ def main():
     print(f"  Gray zone: {len(gray_zone)} sessions (conf < 0.80)")
 
     # ── Disagreements ────────────────────────────────────────
-    disagree = [(i, y_all[i], y_ml[i], y_proba[i]) for i in range(len(y_all)) if y_all[i] != y_ml[i]]
+    disagree = [
+        (i, y_all[i], y_ml[i], y_proba[i])
+        for i in range(len(y_all))
+        if y_all[i] != y_ml[i]
+    ]
     print(f"\n  {len(disagree)} heuristic/ML disagreements:")
     for idx, h, m, proba in disagree[:15]:
         row = df.iloc[idx]
         h_label = "interactive" if h == 1 else "automated"
         m_label = "interactive" if m == 1 else "automated"
         ens = ensemble[idx]
-        print(f"    h={h_label:12s} ml={m_label:12s} ens={ens:12s} conf={proba.max():.3f} "
-              f"user={int(row['user_messages']):3d} dur={row['duration_secs']:7.0f}s "
-              f"pace={row['secs_per_turn']:6.1f} q={row['question_ratio']:.2f} "
-              f"polite={row['politeness_ratio']:.2f} prompt={int(row.get('first_is_prompt', 0))}")
+        print(
+            f"    h={h_label:12s} ml={m_label:12s} ens={ens:12s} conf={proba.max():.3f} "
+            f"user={int(row['user_messages']):3d} dur={row['duration_secs']:7.0f}s "
+            f"pace={row['secs_per_turn']:6.1f} q={row['question_ratio']:.2f} "
+            f"polite={row['politeness_ratio']:.2f} prompt={int(row.get('first_is_prompt', 0))}"
+        )
 
     # ── Ambiguous sessions ───────────────────────────────────
     if len(df_ambiguous) > 0:
@@ -330,17 +376,27 @@ def main():
             m_label = "interactive" if y_ml[idx] == 1 else "automated"
             ens = ensemble[idx]
             conf = y_proba[idx].max()
-            print(f"    h={row['label']:12s} ml={m_label:12s} ens={ens:12s} conf={conf:.3f} "
-                  f"pace={row['secs_per_turn']:6.1f} user={int(row['user_messages']):3d} "
-                  f"tools={int(row['tool_uses']):3d} prompt={int(row.get('first_is_prompt', 0))}")
+            print(
+                f"    h={row['label']:12s} ml={m_label:12s} ens={ens:12s} conf={conf:.3f} "
+                f"pace={row['secs_per_turn']:6.1f} user={int(row['user_messages']):3d} "
+                f"tools={int(row['tool_uses']):3d} prompt={int(row.get('first_is_prompt', 0))}"
+            )
 
     # ── Verify text features are now directionally correct ───
-    print(f"\n  ── Feature direction check (should be higher for interactive) ──\n")
-    for col in ["casual_ratio", "question_ratio", "no_caps_ratio", "typo_score", "politeness_ratio"]:
+    print("\n  ── Feature direction check (should be higher for interactive) ──\n")
+    for col in [
+        "casual_ratio",
+        "question_ratio",
+        "no_caps_ratio",
+        "typo_score",
+        "politeness_ratio",
+    ]:
         int_mean = df[df["label"] == "interactive"][col].mean()
         auto_mean = df[df["label"] == "automated"][col].mean()
         direction = "✓" if int_mean > auto_mean else "✗ INVERTED"
-        print(f"    {col:25s}  interactive={int_mean:.4f}  automated={auto_mean:.4f}  {direction}")
+        print(
+            f"    {col:25s}  interactive={int_mean:.4f}  automated={auto_mean:.4f}  {direction}"
+        )
 
     # ── Serialize calibrated model ───────────────────────────
     model_path = Path(__file__).parent / "resume_resume" / "classifier.pkl"
@@ -349,7 +405,11 @@ def main():
         "feature_cols": FEATURE_COLS,
         "version": 2,
         "trained_on": len(df_train),
-        "accuracy_cv": float(cross_val_score(gb_raw, X_labeled, y_labeled, cv=cv, scoring="accuracy").mean()),
+        "accuracy_cv": float(
+            cross_val_score(
+                gb_raw, X_labeled, y_labeled, cv=cv, scoring="accuracy"
+            ).mean()
+        ),
     }
     with open(model_path, "wb") as f:
         pickle.dump(model_data, f)
@@ -357,8 +417,10 @@ def main():
     print(f"  Size: {model_path.stat().st_size / 1024:.1f} KB")
 
     # ── Summary ──────────────────────────────────────────────
-    print(f"\n  ═══ Summary ═══")
-    print(f"  Trained on {len(df_train)} examples ({len(df_ambiguous)} ambiguous excluded)")
+    print("\n  ═══ Summary ═══")
+    print(
+        f"  Trained on {len(df_train)} examples ({len(df_ambiguous)} ambiguous excluded)"
+    )
     print(f"  CV accuracy: {model_data['accuracy_cv']:.4f}")
     print(f"  Ensemble: {ens_int} interactive, {ens_auto} automated")
     print(f"  Gray zone: {len(gray_zone)} uncertain sessions")

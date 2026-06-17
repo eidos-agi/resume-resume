@@ -154,7 +154,9 @@ def temporal_patterns(sessions: list[dict]) -> dict:
     productive_hour = max(hour_tokens, key=hour_tokens.get) if hour_tokens else 0
 
     # Weekend warrior score
-    weekend_sessions = weekday_counts.get("Saturday", 0) + weekday_counts.get("Sunday", 0)
+    weekend_sessions = weekday_counts.get("Saturday", 0) + weekday_counts.get(
+        "Sunday", 0
+    )
     weekend_pct = round(weekend_sessions / total_sessions * 100, 1)
 
     # Build hourly heatmap (0-23)
@@ -171,7 +173,15 @@ def temporal_patterns(sessions: list[dict]) -> dict:
         }
 
     # Weekly pattern
-    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
     weekly = {d: weekday_counts.get(d, 0) for d in day_order}
     busiest_day = max(weekly, key=weekly.get) if weekly else "Monday"
 
@@ -194,10 +204,16 @@ def project_insights(sessions: list[dict]) -> dict:
     if not sessions:
         return {}
 
-    project_stats = defaultdict(lambda: {
-        "sessions": 0, "tokens": 0, "hours": 0,
-        "first_seen": None, "last_seen": None, "dates": set(),
-    })
+    project_stats = defaultdict(
+        lambda: {
+            "sessions": 0,
+            "tokens": 0,
+            "hours": 0,
+            "first_seen": None,
+            "last_seen": None,
+            "dates": set(),
+        }
+    )
 
     for s in sessions:
         repo = s.get("repo", "unknown")
@@ -214,7 +230,9 @@ def project_insights(sessions: list[dict]) -> dict:
                 ps["last_seen"] = date
 
     # Sort by sessions desc
-    sorted_projects = sorted(project_stats.items(), key=lambda x: x[1]["sessions"], reverse=True)
+    sorted_projects = sorted(
+        project_stats.items(), key=lambda x: x[1]["sessions"], reverse=True
+    )
 
     # Pareto analysis: how many projects account for 80% of sessions
     total_sessions = sum(p[1]["sessions"] for p in sorted_projects)
@@ -243,27 +261,31 @@ def project_insights(sessions: list[dict]) -> dict:
             last_dt = datetime.strptime(stats["last_seen"], "%Y-%m-%d")
             days_inactive = (today_dt - last_dt).days
             if days_inactive > 30 and stats["sessions"] >= 3:
-                abandoned.append({
-                    "project": name,
-                    "sessions": stats["sessions"],
-                    "last_seen": stats["last_seen"],
-                    "days_inactive": days_inactive,
-                })
+                abandoned.append(
+                    {
+                        "project": name,
+                        "sessions": stats["sessions"],
+                        "last_seen": stats["last_seen"],
+                        "days_inactive": days_inactive,
+                    }
+                )
             elif days_inactive <= 7:
                 active.append(name)
 
     # Top projects with clean stats
     top_projects = []
     for name, stats in sorted_projects[:15]:
-        top_projects.append({
-            "project": name,
-            "sessions": stats["sessions"],
-            "tokens": _format_tokens(stats["tokens"]),
-            "hours": round(stats["hours"], 1),
-            "active_days": len(stats["dates"]),
-            "first_seen": stats["first_seen"],
-            "last_seen": stats["last_seen"],
-        })
+        top_projects.append(
+            {
+                "project": name,
+                "sessions": stats["sessions"],
+                "tokens": _format_tokens(stats["tokens"]),
+                "hours": round(stats["hours"], 1),
+                "active_days": len(stats["dates"]),
+                "first_seen": stats["first_seen"],
+                "last_seen": stats["last_seen"],
+            }
+        )
 
     return {
         "total_projects": len(project_stats),
@@ -323,11 +345,17 @@ def tool_usage(sessions: list[dict]) -> dict:
     mcp_tools = {k: v for k, v in all_tools.items() if k.startswith("mcp__")}
     mcp_total = sum(mcp_tools.values())
 
-    top_tools = [{"tool": name, "uses": count, "pct": round(count / max(total_uses, 1) * 100, 1)}
-                 for name, count in all_tools.most_common(20)]
+    top_tools = [
+        {"tool": name, "uses": count, "pct": round(count / max(total_uses, 1) * 100, 1)}
+        for name, count in all_tools.most_common(20)
+    ]
 
-    top_mcp = [{"tool": name.replace("mcp__", ""), "uses": count}
-               for name, count in sorted(mcp_tools.items(), key=lambda x: x[1], reverse=True)[:10]]
+    top_mcp = [
+        {"tool": name.replace("mcp__", ""), "uses": count}
+        for name, count in sorted(mcp_tools.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
+    ]
 
     return {
         "total_tool_uses": total_uses,
@@ -355,8 +383,10 @@ def model_usage(sessions: list[dict]) -> dict:
                 all_models[name] += count
 
     return {
-        "models": [{"model": name, "responses": count}
-                   for name, count in all_models.most_common(10)],
+        "models": [
+            {"model": name, "responses": count}
+            for name, count in all_models.most_common(10)
+        ],
     }
 
 
@@ -404,7 +434,11 @@ def streaks_and_records(sessions: list[dict]) -> dict:
 
     # Late night records (sessions starting after midnight)
     late_sessions = [s for s in sessions if s.get("hour", 12) in [0, 1, 2, 3, 4]]
-    latest_session = max(late_sessions, key=lambda s: s.get("duration_mins", 0)) if late_sessions else None
+    latest_session = (
+        max(late_sessions, key=lambda s: s.get("duration_mins", 0))
+        if late_sessions
+        else None
+    )
 
     return {
         "busiest_day": {
@@ -435,10 +469,14 @@ def streaks_and_records(sessions: list[dict]) -> dict:
         },
         "late_night_sessions": len(late_sessions),
         "latest_marathon": {
-            "duration": _format_duration((latest_session.get("duration_mins", 0) * 60)) if latest_session else "N/A",
+            "duration": _format_duration((latest_session.get("duration_mins", 0) * 60))
+            if latest_session
+            else "N/A",
             "project": latest_session.get("repo", "?") if latest_session else "N/A",
             "date": latest_session.get("date", "?") if latest_session else "N/A",
-            "start_hour": f"{latest_session.get('hour', 0):02d}:00" if latest_session else "N/A",
+            "start_hour": f"{latest_session.get('hour', 0):02d}:00"
+            if latest_session
+            else "N/A",
         },
     }
 
@@ -472,8 +510,10 @@ def predictions(sessions: list[dict]) -> dict:
         dow_match = 1.5 if s.get("weekday") == today_weekday else 1.0
 
         # Hour proximity (gaussian around current hour)
-        hour_diff = min(abs(s.get("hour", 12) - current_hour),
-                       24 - abs(s.get("hour", 12) - current_hour))
+        hour_diff = min(
+            abs(s.get("hour", 12) - current_hour),
+            24 - abs(s.get("hour", 12) - current_hour),
+        )
         hour_match = math.exp(-0.5 * (hour_diff / 3) ** 2)
 
         project_signals[repo] += recency * dow_match * hour_match
@@ -481,7 +521,10 @@ def predictions(sessions: list[dict]) -> dict:
     # Normalize and sort
     max_signal = max(project_signals.values()) if project_signals else 1
     predicted_projects = sorted(
-        [(repo, round(score / max_signal * 100)) for repo, score in project_signals.items()],
+        [
+            (repo, round(score / max_signal * 100))
+            for repo, score in project_signals.items()
+        ],
         key=lambda x: x[1],
         reverse=True,
     )[:5]
@@ -495,8 +538,12 @@ def predictions(sessions: list[dict]) -> dict:
         typical_start = round(_mean([s["hour"] for s in sessions]))
 
     # Session count prediction for today
-    dow_counts = [v for d, v in Counter(s["date"] for s in sessions
-                                         if s.get("weekday") == today_weekday).items()]
+    dow_counts = [
+        v
+        for d, v in Counter(
+            s["date"] for s in sessions if s.get("weekday") == today_weekday
+        ).items()
+    ]
     predicted_today = round(_mean(dow_counts)) if dow_counts else 0
 
     # Streak prediction: are you on a streak?
@@ -515,12 +562,15 @@ def predictions(sessions: list[dict]) -> dict:
             break
 
     return {
-        "next_project": [{"project": p, "confidence": f"{c}%"} for p, c in predicted_projects],
+        "next_project": [
+            {"project": p, "confidence": f"{c}%"} for p, c in predicted_projects
+        ],
         "typical_start_hour": f"{typical_start:02d}:00 on {today_weekday}s",
         "predicted_sessions_today": predicted_today,
         "current_streak_days": current_streak,
-        "streak_message": f"You're on a {current_streak}-day streak!" if current_streak >= 3 else
-                          f"Current streak: {current_streak} day(s)",
+        "streak_message": f"You're on a {current_streak}-day streak!"
+        if current_streak >= 3
+        else f"Current streak: {current_streak} day(s)",
     }
 
 
@@ -532,15 +582,24 @@ def personality_profile(sessions: list[dict]) -> dict:
     traits = []
 
     # Chronotype
-    night_sessions = len([s for s in sessions if s.get("hour", 12) in [22, 23, 0, 1, 2, 3, 4]])
+    night_sessions = len(
+        [s for s in sessions if s.get("hour", 12) in [22, 23, 0, 1, 2, 3, 4]]
+    )
     total = len(sessions)
     if night_sessions / max(total, 1) > 0.25:
         traits.append("Night Owl — you do your best thinking when the world sleeps")
-    elif len([s for s in sessions if s.get("hour", 12) in [5, 6, 7, 8]]) / max(total, 1) > 0.25:
-        traits.append("Early Bird — you hit the ground running before most people wake up")
+    elif (
+        len([s for s in sessions if s.get("hour", 12) in [5, 6, 7, 8]]) / max(total, 1)
+        > 0.25
+    ):
+        traits.append(
+            "Early Bird — you hit the ground running before most people wake up"
+        )
 
     # Session length distribution
-    durations = [s.get("duration_mins", 0) for s in sessions if s.get("duration_mins", 0) > 0]
+    durations = [
+        s.get("duration_mins", 0) for s in sessions if s.get("duration_mins", 0) > 0
+    ]
     if durations:
         median_dur = _median(durations)
         long_sessions = len([d for d in durations if d > 60])
@@ -551,7 +610,9 @@ def personality_profile(sessions: list[dict]) -> dict:
         if short_sessions / max(len(durations), 1) > 0.4:
             traits.append("Quick Draw — lots of short, targeted sessions")
         if median_dur > 30 and long_sessions > 10 and short_sessions > 50:
-            traits.append("Bimodal Worker — you either go deep or get in and out fast, rarely in between")
+            traits.append(
+                "Bimodal Worker — you either go deep or get in and out fast, rarely in between"
+            )
 
     # Project breadth
     projects = set(s.get("repo", "") for s in sessions)
@@ -577,7 +638,9 @@ def personality_profile(sessions: list[dict]) -> dict:
                 all_tools[name] += count
 
     if all_tools.get("Agent", 0) > 100:
-        traits.append("Delegator — you spawn subagents like a general commanding troops")
+        traits.append(
+            "Delegator — you spawn subagents like a general commanding troops"
+        )
     if all_tools.get("Bash", 0) > all_tools.get("Edit", 0) * 2:
         traits.append("Terminal Native — Bash is your primary weapon")
     if all_tools.get("Edit", 0) > all_tools.get("Bash", 0):
@@ -610,7 +673,9 @@ def fun_facts(sessions: list[dict]) -> list[str]:
     output_tokens = sum(s.get("output_tokens", 0) for s in sessions)
     total_msgs = sum(s.get("total_msgs", 0) for s in sessions)
     total_tool_uses = sum(s.get("tool_use_total", 0) for s in sessions)
-    durations = [s.get("duration_mins", 0) for s in sessions if s.get("duration_mins", 0) > 0]
+    durations = [
+        s.get("duration_mins", 0) for s in sessions if s.get("duration_mins", 0) > 0
+    ]
     total_hours = sum(durations) / 60
 
     # Scale comparisons
@@ -619,48 +684,70 @@ def fun_facts(sessions: list[dict]) -> list[str]:
     tweets = words / 40
     phd_theses = words / 80_000  # ~80K words for a thesis
 
-    facts.append(f"Claude has written you {words:,} words — that's {novels:.1f} novels or {int(tweets):,} tweets")
+    facts.append(
+        f"Claude has written you {words:,} words — that's {novels:.1f} novels or {int(tweets):,} tweets"
+    )
 
     if total_hours > 100:
         netflix_seasons = total_hours / 10  # ~10 hours per season
-        facts.append(f"You've spent {total_hours:.0f} hours in Claude sessions — equivalent to binging {netflix_seasons:.0f} seasons of TV")
+        facts.append(
+            f"You've spent {total_hours:.0f} hours in Claude sessions — equivalent to binging {netflix_seasons:.0f} seasons of TV"
+        )
 
     if total_tokens > 1_000_000_000:
-        facts.append(f"You've processed {total_tokens / 1_000_000_000:.1f} BILLION tokens. That's more text than the entire English Wikipedia.")
+        facts.append(
+            f"You've processed {total_tokens / 1_000_000_000:.1f} BILLION tokens. That's more text than the entire English Wikipedia."
+        )
     elif total_tokens > 100_000_000:
         encyclopedias = total_tokens / 40_000_000  # Britannica is ~40M words
-        facts.append(f"You've processed {total_tokens / 1_000_000:.0f}M tokens — about {encyclopedias:.1f}x the Encyclopaedia Britannica")
+        facts.append(
+            f"You've processed {total_tokens / 1_000_000:.0f}M tokens — about {encyclopedias:.1f}x the Encyclopaedia Britannica"
+        )
 
     if total_tool_uses > 10000:
-        facts.append(f"Claude has used {total_tool_uses:,} tools for you. That's {total_tool_uses / max(total, 1):.0f} tool calls per session on average.")
+        facts.append(
+            f"Claude has used {total_tool_uses:,} tools for you. That's {total_tool_uses / max(total, 1):.0f} tool calls per session on average."
+        )
 
     # Day patterns
     day_counts = Counter(s["date"] for s in sessions)
     if day_counts:
         busiest = day_counts.most_common(1)[0]
-        facts.append(f"Your most intense day: {busiest[0]} with {busiest[1]} sessions. What were you building?")
+        facts.append(
+            f"Your most intense day: {busiest[0]} with {busiest[1]} sessions. What were you building?"
+        )
 
     # Late night
     late = len([s for s in sessions if s.get("hour", 12) in [0, 1, 2, 3, 4]])
     if late > 20:
-        facts.append(f"You've had {late} sessions between midnight and 5 AM. Sleep is a suggestion, not a requirement.")
+        facts.append(
+            f"You've had {late} sessions between midnight and 5 AM. Sleep is a suggestion, not a requirement."
+        )
     elif late > 5:
-        facts.append(f"{late} sessions between midnight and 5 AM. The code doesn't write itself... or does it?")
+        facts.append(
+            f"{late} sessions between midnight and 5 AM. The code doesn't write itself... or does it?"
+        )
 
     # Project hopping
     day_projects = defaultdict(set)
     for s in sessions:
         day_projects[s.get("date", "")].add(s.get("repo", ""))
-    max_projects_day = max((len(p), d) for d, p in day_projects.items()) if day_projects else (0, "?")
+    max_projects_day = (
+        max((len(p), d) for d, p in day_projects.items()) if day_projects else (0, "?")
+    )
     if max_projects_day[0] > 5:
-        facts.append(f"On {max_projects_day[1]}, you touched {max_projects_day[0]} different projects. ADHD or ambition? Yes.")
+        facts.append(
+            f"On {max_projects_day[1]}, you touched {max_projects_day[0]} different projects. ADHD or ambition? Yes."
+        )
 
     # Cost
     input_tokens = sum(s.get("input_tokens", 0) for s in sessions)
     cost = (input_tokens / 1_000_000 * 15) + (output_tokens / 1_000_000 * 75)
     if cost > 100:
         coffees = cost / 5
-        facts.append(f"Estimated API spend: ${cost:,.0f}. That's {coffees:.0f} cups of coffee. Worth it.")
+        facts.append(
+            f"Estimated API spend: ${cost:,.0f}. That's {coffees:.0f} cups of coffee. Worth it."
+        )
 
     return facts
 

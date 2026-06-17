@@ -22,7 +22,14 @@ from claude_session_commons.session_index import SessionIndex
 
 from .resume_card import build_card
 from .sessions import shorten_path
-from .search_index import HOT_WINDOW_SECONDS, count_matches, recent_candidates, refresh_budget, search, status
+from .search_index import (
+    HOT_WINDOW_SECONDS,
+    count_matches,
+    recent_candidates,
+    refresh_budget,
+    search,
+    status,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE_DIR = ROOT / "site"
@@ -55,13 +62,16 @@ def _indexed_hot_sessions(window_seconds: int = HOT_WINDOW_SECONDS) -> list[dict
             size = int(meta.get("size") or 0)
             if mtime < cutoff or size < 100:
                 continue
-            sessions.append({
-                "session_id": sid,
-                "file": Path(meta["file_path"]),
-                "project_dir": meta.get("project_dir") or decode_project_path(Path(meta["file_path"]).parent.name),
-                "mtime": mtime,
-                "size": size,
-            })
+            sessions.append(
+                {
+                    "session_id": sid,
+                    "file": Path(meta["file_path"]),
+                    "project_dir": meta.get("project_dir")
+                    or decode_project_path(Path(meta["file_path"]).parent.name),
+                    "mtime": mtime,
+                    "size": size,
+                }
+            )
         except Exception:
             continue
 
@@ -76,7 +86,9 @@ def _query_terms(query: str) -> list[bytes]:
     remaining = re.sub(r'"[^"]*"', "", query).strip()
     words = [w for w in remaining.lower().split() if w]
     terms = [*phrases, *words]
-    return [term.lower().encode("utf-8", errors="replace") for term in terms if term.strip()]
+    return [
+        term.lower().encode("utf-8", errors="replace") for term in terms if term.strip()
+    ]
 
 
 def _read_session_bytes(session: dict, chunk_size: int = 1024 * 1024) -> bytes | None:
@@ -113,7 +125,9 @@ def _snippet(raw: bytes, term: bytes, context_chars: int = 80) -> str:
     return text
 
 
-def _hot_search(query: str, limit: int, cutoff_after: float, project: str) -> tuple[list[dict], int]:
+def _hot_search(
+    query: str, limit: int, cutoff_after: float, project: str
+) -> tuple[list[dict], int]:
     terms = _query_terms(query)
     if not terms:
         return [], 0
@@ -123,7 +137,9 @@ def _hot_search(query: str, limit: int, cutoff_after: float, project: str) -> tu
         sessions = [s for s in sessions if s["mtime"] >= cutoff_after]
     if project:
         project_lower = project.lower()
-        sessions = [s for s in sessions if project_lower in s.get("project_dir", "").lower()]
+        sessions = [
+            s for s in sessions if project_lower in s.get("project_dir", "").lower()
+        ]
 
     def check(session: dict) -> dict | None:
         raw = _read_session_bytes(session)
@@ -142,7 +158,9 @@ def _hot_search(query: str, limit: int, cutoff_after: float, project: str) -> tu
             "title": title,
             "project": shorten_path(session.get("project_dir") or ""),
             "date": session["mtime"],
-            "score": round(100.0 * math.exp(-0.0002 * max(time.time() - session["mtime"], 0)), 1),
+            "score": round(
+                100.0 * math.exp(-0.0002 * max(time.time() - session["mtime"], 0)), 1
+            ),
             "state": _snippet(raw, rarest),
             "hits": sum(counts),
             "source": "hot-live",
@@ -159,7 +177,9 @@ def _hot_search(query: str, limit: int, cutoff_after: float, project: str) -> tu
     return matches[:limit], len(matches)
 
 
-def _json(handler: BaseHTTPRequestHandler, payload: dict, status_code: int = 200) -> None:
+def _json(
+    handler: BaseHTTPRequestHandler, payload: dict, status_code: int = 200
+) -> None:
     data = json.dumps(payload).encode("utf-8")
     handler.send_response(status_code)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
@@ -181,7 +201,12 @@ def _search_result(query: str, limit: int, hours: int, project: str, mode: str) 
         hot_items, hot_total = _hot_search(query, limit, cutoff_after, project)
     remaining = max(limit - len(hot_items), 0)
     if not remaining or mode == "hot":
-        return {"items": hot_items, "total": hot_total, "hot_total": hot_total, "cold_total": 0}
+        return {
+            "items": hot_items,
+            "total": hot_total,
+            "hot_total": hot_total,
+            "cold_total": 0,
+        }
 
     cold_total = count_matches(
         query,
@@ -203,15 +228,17 @@ def _search_result(query: str, limit: int, hours: int, project: str, mode: str) 
         title = row.get("title") or "Untitled session"
         if title.lower().startswith(NOISE_TITLE_PREFIXES):
             continue
-        items.append({
-            "id": row["session_id"],
-            "title": title,
-            "project": row.get("project_dir") or "",
-            "date": row.get("mtime"),
-            "score": abs(float(row.get("rank") or 0.0)),
-            "state": row.get("state") or "",
-            "source": "cold-index",
-        })
+        items.append(
+            {
+                "id": row["session_id"],
+                "title": title,
+                "project": row.get("project_dir") or "",
+                "date": row.get("mtime"),
+                "score": abs(float(row.get("rank") or 0.0)),
+                "state": row.get("state") or "",
+                "source": "cold-index",
+            }
+        )
         if len(items) >= remaining:
             break
     return {
@@ -232,17 +259,22 @@ def _recent_result(limit: int, hours: int, project: str, mode: str) -> dict:
         for session in _indexed_hot_sessions():
             if cutoff_after and session["mtime"] < cutoff_after:
                 continue
-            if project and project.lower() not in session.get("project_dir", "").lower():
+            if (
+                project
+                and project.lower() not in session.get("project_dir", "").lower()
+            ):
                 continue
-            hot_items.append({
-                "id": session["session_id"],
-                "title": session["file"].stem,
-                "project": shorten_path(session.get("project_dir") or ""),
-                "date": session["mtime"],
-                "score": 0,
-                "state": "Touched in the live hot window.",
-                "source": "hot-live",
-            })
+            hot_items.append(
+                {
+                    "id": session["session_id"],
+                    "title": session["file"].stem,
+                    "project": shorten_path(session.get("project_dir") or ""),
+                    "date": session["mtime"],
+                    "score": 0,
+                    "state": "Touched in the live hot window.",
+                    "source": "hot-live",
+                }
+            )
             if len(hot_items) >= limit:
                 return {
                     "items": hot_items,
@@ -251,7 +283,12 @@ def _recent_result(limit: int, hours: int, project: str, mode: str) -> dict:
                     "cold_total": 0,
                 }
     if mode == "hot":
-        return {"items": hot_items, "total": len(hot_items), "hot_total": len(hot_items), "cold_total": 0}
+        return {
+            "items": hot_items,
+            "total": len(hot_items),
+            "hot_total": len(hot_items),
+            "cold_total": 0,
+        }
 
     cold_cutoff = time.time() - HOT_WINDOW_SECONDS
     rows = recent_candidates(
@@ -267,15 +304,17 @@ def _recent_result(limit: int, hours: int, project: str, mode: str) -> dict:
         title = row.get("title") or "Untitled session"
         if title.lower().startswith(NOISE_TITLE_PREFIXES):
             continue
-        cold_items.append({
-            "id": row["session_id"],
-            "title": title,
-            "project": shorten_path(row.get("project_dir") or ""),
-            "date": row["mtime"],
-            "score": float(row.get("score") or 0.0),
-            "state": row.get("state") or "",
-            "source": "cold-index",
-        })
+        cold_items.append(
+            {
+                "id": row["session_id"],
+                "title": title,
+                "project": shorten_path(row.get("project_dir") or ""),
+                "date": row["mtime"],
+                "score": float(row.get("score") or 0.0),
+                "state": row.get("state") or "",
+                "source": "cold-index",
+            }
+        )
         if len(cold_items) + len(hot_items) >= limit:
             break
     # For the unqueried landing state, total is the visible, bounded recent set.
@@ -338,22 +377,28 @@ class Handler(BaseHTTPRequestHandler):
             if not query:
                 result = _recent_result(limit, hours, project, mode)
                 index = status()
-                _json(self, {
-                    **result,
-                    "count": len(result["items"]),
-                    "view": "recent",
-                    "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
-                    "index": index,
-                })
+                _json(
+                    self,
+                    {
+                        **result,
+                        "count": len(result["items"]),
+                        "view": "recent",
+                        "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
+                        "index": index,
+                    },
+                )
                 return
             result = _search_result(query, limit, hours, project, mode)
-            _json(self, {
-                **result,
-                "count": len(result["items"]),
-                "view": "search",
-                "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
-                "index": status(),
-            })
+            _json(
+                self,
+                {
+                    **result,
+                    "count": len(result["items"]),
+                    "view": "search",
+                    "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
+                    "index": status(),
+                },
+            )
             return
 
         if path == "/api/index/refresh":
@@ -369,11 +414,14 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/status":
-            _json(self, {
-                "index": status(),
-                "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
-                "hot_sessions": len(_indexed_hot_sessions()),
-            })
+            _json(
+                self,
+                {
+                    "index": status(),
+                    "hot_window_minutes": int(HOT_WINDOW_SECONDS / 60),
+                    "hot_sessions": len(_indexed_hot_sessions()),
+                },
+            )
             return
 
         self._serve_static(path)

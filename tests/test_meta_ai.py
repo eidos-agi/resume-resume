@@ -25,17 +25,20 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(meta_ai, "THRESHOLDS_FILE", tmp_path / "thresholds.json")
     (tmp_path / "a1_skill.md").write_text("---\nname: a1\n---\n# A1\nplaceholder\n")
     (tmp_path / "a2_skill.md").write_text("---\nname: a2\n---\n# A2\nplaceholder\n")
-    meta_ai.save_thresholds({
-        "slow_tool_p95_ms": 1000,
-        "a1_min_confidence": 0.6,
-        "a2_min_confidence": 0.7,
-    })
+    meta_ai.save_thresholds(
+        {
+            "slow_tool_p95_ms": 1000,
+            "a1_min_confidence": 0.6,
+            "a2_min_confidence": 0.7,
+        }
+    )
     return tmp_path
 
 
 # ---------------------------------------------------------------------------
 # Thresholds
 # ---------------------------------------------------------------------------
+
 
 def test_load_and_save_thresholds(isolated):
     t = meta_ai.load_thresholds()
@@ -54,6 +57,7 @@ def test_load_thresholds_returns_defaults_if_missing(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # A1 filing
 # ---------------------------------------------------------------------------
+
 
 def test_file_a1_recommendation_basic(isolated):
     rec = meta_ai.file_a1_recommendation(
@@ -143,17 +147,26 @@ def test_file_a1_skips_low_confidence(isolated):
 
 def test_file_a1_skips_empty_title(isolated):
     result = meta_ai.file_a1_recommendation(
-        type="tune", title="   ", evidence="x", confidence=0.9,
+        type="tune",
+        title="   ",
+        evidence="x",
+        confidence=0.9,
     )
     assert result.get("skipped") == "empty_title"
 
 
 def test_file_a1_dedupes_recent_duplicate(isolated):
     first = meta_ai.file_a1_recommendation(
-        type="optimize", title="Optimize X", evidence="...", confidence=0.8,
+        type="optimize",
+        title="Optimize X",
+        evidence="...",
+        confidence=0.8,
     )
     second = meta_ai.file_a1_recommendation(
-        type="optimize", title="optimize x", evidence="...", confidence=0.8,
+        type="optimize",
+        title="optimize x",
+        evidence="...",
+        confidence=0.8,
     )
     assert first.get("id")
     assert second.get("skipped") == "duplicate"
@@ -162,6 +175,7 @@ def test_file_a1_dedupes_recent_duplicate(isolated):
 # ---------------------------------------------------------------------------
 # A2 filing
 # ---------------------------------------------------------------------------
+
 
 def test_file_a2_proposal_basic(isolated):
     p = meta_ai.file_a2_proposal(
@@ -179,36 +193,51 @@ def test_file_a2_proposal_basic(isolated):
 
 def test_file_a2_skips_invalid_target(isolated):
     result = meta_ai.file_a2_proposal(
-        target="random_file", change_type="prompt_edit",
-        title="x", evidence="x", confidence=0.9,
+        target="random_file",
+        change_type="prompt_edit",
+        title="x",
+        evidence="x",
+        confidence=0.9,
     )
     assert result.get("skipped") == "invalid_target"
 
 
 def test_file_a2_skips_invalid_change_type(isolated):
     result = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="refactor_everything",
-        title="x", evidence="x", confidence=0.9,
+        target="a1_prompt",
+        change_type="refactor_everything",
+        title="x",
+        evidence="x",
+        confidence=0.9,
     )
     assert result.get("skipped") == "invalid_change_type"
 
 
 def test_file_a2_skips_low_confidence(isolated):
     result = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="prompt_edit",
-        title="x", evidence="x", confidence=0.5,
+        target="a1_prompt",
+        change_type="prompt_edit",
+        title="x",
+        evidence="x",
+        confidence=0.5,
     )
     assert result.get("skipped") == "low_confidence"
 
 
 def test_file_a2_dedupes_pending(isolated):
     first = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="criterion_add",
-        title="Add thing", evidence="...", confidence=0.8,
+        target="a1_prompt",
+        change_type="criterion_add",
+        title="Add thing",
+        evidence="...",
+        confidence=0.8,
     )
     second = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="criterion_add",
-        title="add thing", evidence="...", confidence=0.8,
+        target="a1_prompt",
+        change_type="criterion_add",
+        title="add thing",
+        evidence="...",
+        confidence=0.8,
     )
     assert first.get("id")
     assert second.get("skipped") == "duplicate_pending"
@@ -218,10 +247,13 @@ def test_file_a2_dedupes_pending(isolated):
 # Decide + apply
 # ---------------------------------------------------------------------------
 
+
 def test_decide_approve_threshold_change(isolated):
     p = meta_ai.file_a2_proposal(
-        target="thresholds.json", change_type="threshold_change",
-        title="Raise slow threshold", evidence="rejections",
+        target="thresholds.json",
+        change_type="threshold_change",
+        title="Raise slow threshold",
+        evidence="rejections",
         confidence=0.85,
         diff={"key": "slow_tool_p95_ms", "from": 1000, "to": 2500},
     )
@@ -234,8 +266,10 @@ def test_decide_approve_threshold_change(isolated):
 def test_decide_approve_prompt_edit_dict_form(isolated):
     new_text = "---\nname: a1\n---\n# A1\nbrand new body\n"
     p = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="prompt_edit",
-        title="Rewrite A1 prompt", evidence="clarity",
+        target="a1_prompt",
+        change_type="prompt_edit",
+        title="Rewrite A1 prompt",
+        evidence="clarity",
         confidence=0.9,
         diff={"full_new_text": new_text},
     )
@@ -250,8 +284,10 @@ def test_decide_approve_prompt_edit_json_string_form(isolated):
     _coerce_diff must decode it so apply doesn't fail."""
     new_text = "---\nname: a1\n---\n# A1\nfrom json string\n"
     p = meta_ai.file_a2_proposal(
-        target="a1_prompt", change_type="prompt_edit",
-        title="Rewrite via json string", evidence="transport artifact",
+        target="a1_prompt",
+        change_type="prompt_edit",
+        title="Rewrite via json string",
+        evidence="transport artifact",
         confidence=0.9,
         diff=json.dumps({"full_new_text": new_text}),
     )
@@ -279,8 +315,11 @@ def test_coerce_diff_decodes_json_dict(isolated):
 
 def test_decide_reject_does_not_apply(isolated):
     p = meta_ai.file_a2_proposal(
-        target="thresholds.json", change_type="threshold_change",
-        title="Nope", evidence="...", confidence=0.85,
+        target="thresholds.json",
+        change_type="threshold_change",
+        title="Nope",
+        evidence="...",
+        confidence=0.85,
         diff={"key": "slow_tool_p95_ms", "from": 1000, "to": 99999},
     )
     meta_ai.decide_proposal(p["id"], "rejected", reason="too aggressive")
@@ -302,8 +341,10 @@ def test_decide_apply_records_error_on_non_tunable_key(isolated):
         "diff": {"key": "not_a_real_key", "to": 42},
         "expected_effect": "...",
         "state": "pending",
-        "decided_at": None, "decided_reason": None,
-        "applied_at": None, "apply_error": None,
+        "decided_at": None,
+        "decided_reason": None,
+        "applied_at": None,
+        "apply_error": None,
     }
     meta_ai._append(meta_ai._a2_log(), proposal)
     out = meta_ai.decide_proposal("p-bad", "approved")
@@ -323,8 +364,11 @@ def test_decide_invalid_verdict_raises(isolated):
 
 def test_event_sourced_latest_state_wins(isolated):
     p = meta_ai.file_a2_proposal(
-        target="thresholds.json", change_type="threshold_change",
-        title="Thing", evidence="...", confidence=0.8,
+        target="thresholds.json",
+        change_type="threshold_change",
+        title="Thing",
+        evidence="...",
+        confidence=0.8,
         diff={"key": "slow_tool_p95_ms", "from": 1000, "to": 1500},
     )
     meta_ai.decide_proposal(p["id"], "deferred", reason="not now")
@@ -339,13 +383,22 @@ def test_event_sourced_latest_state_wins(isolated):
 # Read helpers
 # ---------------------------------------------------------------------------
 
+
 def test_a1_recent_filters_by_action_class(isolated):
     meta_ai.file_a1_recommendation(
-        type="tune", title="one", evidence="...", confidence=0.8,
-        action_class="auto", target="slow_tool_p95_ms", new_value=1100,
+        type="tune",
+        title="one",
+        evidence="...",
+        confidence=0.8,
+        action_class="auto",
+        target="slow_tool_p95_ms",
+        new_value=1100,
     )
     meta_ai.file_a1_recommendation(
-        type="optimize", title="two", evidence="...", confidence=0.8,
+        type="optimize",
+        title="two",
+        evidence="...",
+        confidence=0.8,
         action_class="queued",
     )
     auto = meta_ai.a1_recent_recommendations(action_class="auto")

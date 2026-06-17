@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -24,7 +23,9 @@ from .sessions import PROJECTS_DIR, SessionCache, relative_time, shorten_path
 from .search_index import recent_candidates
 from .session_utils import resume_command
 
-UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+UUID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I
+)
 
 _NOISE_TITLE_PREFIXES = (
     "summarize what",
@@ -60,14 +61,16 @@ def _indexed_sessions() -> list[dict[str, Any]]:
     sessions = []
     for sid, meta in known.items():
         try:
-            sessions.append({
-                "session_id": sid,
-                "file": Path(meta["file_path"]),
-                "project_dir": meta.get("project_dir") or "",
-                "mtime": float(meta.get("mtime") or 0.0),
-                "size": int(meta.get("size") or 0),
-                "last_entry_type": meta.get("last_entry_type"),
-            })
+            sessions.append(
+                {
+                    "session_id": sid,
+                    "file": Path(meta["file_path"]),
+                    "project_dir": meta.get("project_dir") or "",
+                    "mtime": float(meta.get("mtime") or 0.0),
+                    "size": int(meta.get("size") or 0),
+                    "last_entry_type": meta.get("last_entry_type"),
+                }
+            )
         except Exception:
             continue
     sessions.sort(key=lambda s: s["mtime"], reverse=True)
@@ -108,7 +111,9 @@ def _is_noise_candidate(session: dict[str, Any]) -> bool:
     return False
 
 
-def _find_session(session_id: str | None, hours: float, *, include_noise: bool = False) -> dict[str, Any] | None:
+def _find_session(
+    session_id: str | None, hours: float, *, include_noise: bool = False
+) -> dict[str, Any] | None:
     if session_id:
         sessions = _indexed_sessions()
         for s in sessions:
@@ -139,7 +144,11 @@ def _find_session(session_id: str | None, hours: float, *, include_noise: bool =
 
     sessions = _indexed_sessions()
     for s in sessions:
-        if s["mtime"] >= cutoff and s["file"].exists() and (include_noise or not _is_noise_candidate(s)):
+        if (
+            s["mtime"] >= cutoff
+            and s["file"].exists()
+            and (include_noise or not _is_noise_candidate(s))
+        ):
             return s
     if include_noise:
         return sessions[0] if sessions else None
@@ -272,8 +281,17 @@ def build_card(
                     if not isinstance(block, dict) or block.get("type") != "tool_use":
                         continue
                     name = str(block.get("name") or "")
-                    inp = block.get("input") if isinstance(block.get("input"), dict) else {}
-                    label = inp.get("file_path") or inp.get("path") or inp.get("command") or ""
+                    inp = (
+                        block.get("input")
+                        if isinstance(block.get("input"), dict)
+                        else {}
+                    )
+                    label = (
+                        inp.get("file_path")
+                        or inp.get("path")
+                        or inp.get("command")
+                        or ""
+                    )
                     if label:
                         last_tool = f"{name}: {str(label)[:160]}"
                     else:
@@ -299,21 +317,32 @@ def build_card(
         "mtime": session["mtime"],
         "date": datetime.fromtimestamp(session["mtime"]).isoformat(timespec="seconds"),
         "title": title_text or last_user[:90] or "Untitled Claude Code session",
-        "where_stopped": local or str(summary.get("state") or "").strip() or last_assistant[:240],
+        "where_stopped": local
+        or str(summary.get("state") or "").strip()
+        or last_assistant[:240],
         "last_user": last_user[:500],
         "last_assistant": last_assistant[:500],
         "last_tool": last_tool,
         "files": touched_files[:8] or list(summary.get("files") or [])[:8],
         "git": _git_dirty(project_dir),
         "command": command,
-        "source": "local-t5" if local else ("cached-summary" if summary else "tail-extractive"),
+        "source": "local-t5"
+        if local
+        else ("cached-summary" if summary else "tail-extractive"),
     }
 
 
 def card_events(card: dict[str, Any]) -> list[dict[str, Any]]:
     channel = "resume card"
     if "error" in card:
-        return [{"channel": channel, "text": card["error"], "icon": "error", "highlight": True}]
+        return [
+            {
+                "channel": channel,
+                "text": card["error"],
+                "icon": "error",
+                "highlight": True,
+            }
+        ]
     events = [
         {"channel": channel, "clear": True},
         {
@@ -332,14 +361,20 @@ def card_events(card: dict[str, Any]) -> list[dict[str, Any]]:
         },
     ]
     if card.get("last_tool"):
-        events.append({"channel": channel, "text": card["last_tool"], "icon": "working"})
+        events.append(
+            {"channel": channel, "text": card["last_tool"], "icon": "working"}
+        )
     if card.get("git", {}).get("dirty"):
-        events.append({
-            "channel": channel,
-            "text": f"Dirty repo: {card['git'].get('count', 0)} file(s)",
-            "icon": "working",
-        })
-    events.append({"channel": channel, "text": card["command"], "icon": "done", "highlight": True})
+        events.append(
+            {
+                "channel": channel,
+                "text": f"Dirty repo: {card['git'].get('count', 0)} file(s)",
+                "icon": "working",
+            }
+        )
+    events.append(
+        {"channel": channel, "text": card["command"], "icon": "done", "highlight": True}
+    )
     return events
 
 
@@ -363,14 +398,30 @@ def _print_human(card: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Show a fast resume card for a Claude Code session")
-    parser.add_argument("session", nargs="?", help="Session UUID. Defaults to latest indexed session.")
-    parser.add_argument("--hours", type=float, default=1.0, help="Latest-session lookback window")
+    parser = argparse.ArgumentParser(
+        description="Show a fast resume card for a Claude Code session"
+    )
+    parser.add_argument(
+        "session", nargs="?", help="Session UUID. Defaults to latest indexed session."
+    )
+    parser.add_argument(
+        "--hours", type=float, default=1.0, help="Latest-session lookback window"
+    )
     parser.add_argument("--json", action="store_true", help="Print one JSON object")
     parser.add_argument("--events", action="store_true", help="Print HUD JSONL events")
-    parser.add_argument("--hud", action="store_true", help="Send events to the resume-resume HUD")
-    parser.add_argument("--local-summary", action="store_true", help="Use cached local ONNX/T5 model if present")
-    parser.add_argument("--include-noise", action="store_true", help="Allow summarizer/meta sessions as latest candidates")
+    parser.add_argument(
+        "--hud", action="store_true", help="Send events to the resume-resume HUD"
+    )
+    parser.add_argument(
+        "--local-summary",
+        action="store_true",
+        help="Use cached local ONNX/T5 model if present",
+    )
+    parser.add_argument(
+        "--include-noise",
+        action="store_true",
+        help="Allow summarizer/meta sessions as latest candidates",
+    )
     args = parser.parse_args(argv)
 
     sid = args.session
@@ -378,7 +429,12 @@ def main(argv: list[str] | None = None) -> None:
         match = UUID_RE.search(sid)
         sid = match.group(0) if match else sid
 
-    card = build_card(sid, hours=args.hours, local_summary=args.local_summary, include_noise=args.include_noise)
+    card = build_card(
+        sid,
+        hours=args.hours,
+        local_summary=args.local_summary,
+        include_noise=args.include_noise,
+    )
 
     if args.hud:
         from .progress import progress
@@ -391,7 +447,11 @@ def main(argv: list[str] | None = None) -> None:
                     r = event["result"]
                     p.result(r["title"], r["meta"], r.get("session_id", ""))
                 else:
-                    p.update(event.get("text", ""), event.get("icon", "info"), event.get("highlight", False))
+                    p.update(
+                        event.get("text", ""),
+                        event.get("icon", "info"),
+                        event.get("highlight", False),
+                    )
 
     if args.events:
         for event in card_events(card):

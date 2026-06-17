@@ -28,7 +28,11 @@ from .sessions import (
     PROJECTS_DIR,
 )
 from claude_session_commons import decode_project_path
-from claude_session_commons.codex import CODEX_SESSIONS_DIR, _read_codex_cwd, session_tool
+from claude_session_commons.codex import (
+    CODEX_SESSIONS_DIR,
+    _read_codex_cwd,
+    session_tool,
+)
 from .summarize import summarize_quick, summarize_deep, summarize_insight, auto_tier
 from .progress import progress
 from .search_index import HOT_WINDOW_SECONDS
@@ -58,7 +62,10 @@ _ALL_SESSIONS_CACHE_TTL = 10.0
 
 def _find_all_sessions_cached() -> list[dict]:
     now = time.time()
-    if _ALL_SESSIONS_CACHE["data"] is not None and (now - _ALL_SESSIONS_CACHE["ts"]) < _ALL_SESSIONS_CACHE_TTL:
+    if (
+        _ALL_SESSIONS_CACHE["data"] is not None
+        and (now - _ALL_SESSIONS_CACHE["ts"]) < _ALL_SESSIONS_CACHE_TTL
+    ):
         return _ALL_SESSIONS_CACHE["data"]
     result = find_all_sessions()
     _ALL_SESSIONS_CACHE["data"] = result
@@ -78,7 +85,10 @@ _HOT_SESSIONS_CACHE_TTL = 5.0
 
 def _get_cache_index() -> dict[str, dict]:
     now = time.time()
-    if _CACHE_INDEX["data"] is not None and (now - _CACHE_INDEX["ts"]) < _CACHE_INDEX_TTL:
+    if (
+        _CACHE_INDEX["data"] is not None
+        and (now - _CACHE_INDEX["ts"]) < _CACHE_INDEX_TTL
+    ):
         return _CACHE_INDEX["data"]
     cache_index: dict[str, dict] = {}
     if _cache._dir.exists():
@@ -104,6 +114,7 @@ def _indexed_sessions_only() -> list[dict]:
     """
     try:
         from claude_session_commons.session_index import SessionIndex
+
         known = SessionIndex.get_default().get_all()
     except Exception:
         return []
@@ -114,14 +125,16 @@ def _indexed_sessions_only() -> list[dict]:
             size = meta.get("size", 0)
             if size < 100:
                 continue
-            sessions.append({
-                "file": Path(meta["file_path"]),
-                "session_id": sid,
-                "project_dir": meta.get("project_dir", ""),
-                "mtime": float(meta.get("mtime") or 0.0),
-                "size": size,
-                "last_entry_type": meta.get("last_entry_type"),
-            })
+            sessions.append(
+                {
+                    "file": Path(meta["file_path"]),
+                    "session_id": sid,
+                    "project_dir": meta.get("project_dir", ""),
+                    "mtime": float(meta.get("mtime") or 0.0),
+                    "size": size,
+                    "last_entry_type": meta.get("last_entry_type"),
+                }
+            )
         except Exception:
             continue
     sessions.sort(key=lambda s: s["mtime"], reverse=True)
@@ -175,7 +188,12 @@ def _summary_valid(summary: dict) -> bool:
         if isinstance(field, str) and ("<" in field and ">" in field):
             return False
     # Reject if title is too short to be useful (random fragments)
-    if isinstance(title, str) and 0 < len(title) < 20 and not summary.get("goal") and not summary.get("what_was_done"):
+    if (
+        isinstance(title, str)
+        and 0 < len(title) < 20
+        and not summary.get("goal")
+        and not summary.get("what_was_done")
+    ):
         return False
     # Reject if no meaningful content at all
     has_content = any(
@@ -248,7 +266,9 @@ def _queue_to_daemon(session_id: str, session_file: str, project_dir: str) -> No
         "project_dir": project_dir,
         "quick_summary": None,
     }
-    (task_dir / f"{priority}-summarize-{session_id[:8]}.json").write_text(json.dumps(task))
+    (task_dir / f"{priority}-summarize-{session_id[:8]}.json").write_text(
+        json.dumps(task)
+    )
 
 
 def _get_title(session_id: str, session_file: Path) -> str:
@@ -289,7 +309,9 @@ def _session_health(s: dict, cache_index: dict | None = None) -> dict:
         cached = cache_index.get(sid, {})
         summary = cached.get("summary")
         has_summary = isinstance(summary, dict) and bool(summary)
-        title = (summary.get("title", "") if isinstance(summary, dict) else "") or _get_title(sid, s["file"])
+        title = (
+            summary.get("title", "") if isinstance(summary, dict) else ""
+        ) or _get_title(sid, s["file"])
     else:
         title = _get_title(sid, s["file"])
         has_summary = bool(_cache._read(sid).get("summary"))
@@ -297,17 +319,18 @@ def _session_health(s: dict, cache_index: dict | None = None) -> dict:
     has_title = bool(title and len(title) > 5)
 
     score = (
-        0.30 * dur_score +
-        0.25 * size_score +
-        0.25 * (1.0 if has_summary else 0.0) +
-        0.20 * (1.0 if has_title else 0.0)
+        0.30 * dur_score
+        + 0.25 * size_score
+        + 0.25 * (1.0 if has_summary else 0.0)
+        + 0.20 * (1.0 if has_title else 0.0)
     )
 
     return {"health": round(score * 100, 0)}
 
 
-def _session_row(s: dict, extra: dict | None = None,
-                 cache_index: dict | None = None) -> dict:
+def _session_row(
+    s: dict, extra: dict | None = None, cache_index: dict | None = None
+) -> dict:
     """Standard compact session row with health score."""
     health = _session_health(s, cache_index=cache_index)
     row = {
@@ -354,8 +377,8 @@ def _extract_snippet(raw: bytes, term: bytes, context_chars: int = 80) -> str:
         return ""
     # Strip partial JSON escapes and control chars
     text = text.replace("\\n", " ").replace("\\t", " ").replace('\\"', '"')
-    text = re.sub(r'["\{\}\[\]\\]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r'["\{\}\[\]\\]', "", text)
+    text = re.sub(r"\s+", " ", text).strip()
     if start > 0:
         text = "..." + text
     if end < len(raw):
@@ -373,6 +396,7 @@ def _search_l2_topics(query_tokens: list[str], limit: int = 5) -> list[dict]:
         return []
     try:
         from claude_session_commons.insights import get_db
+
         conn = get_db()
         rows = conn.execute(
             """SELECT entity_id, title, summary_text, updated_at
@@ -392,17 +416,26 @@ def _search_l2_topics(query_tokens: list[str], limit: int = 5) -> list[dict]:
         topic_name = parts[1] if len(parts) > 1 else title
 
         try:
-            summary = json.loads(summary_text) if isinstance(summary_text, str) else (summary_text or {})
+            summary = (
+                json.loads(summary_text)
+                if isinstance(summary_text, str)
+                else (summary_text or {})
+            )
         except (json.JSONDecodeError, TypeError):
             summary = {}
 
-        search_text = " ".join(filter(None, [
-            topic_name,
-            summary.get("status", ""),
-            summary.get("narrative", ""),
-            " ".join(summary.get("key_decisions", [])),
-            " ".join(summary.get("open_threads", [])),
-        ]))
+        search_text = " ".join(
+            filter(
+                None,
+                [
+                    topic_name,
+                    summary.get("status", ""),
+                    summary.get("narrative", ""),
+                    " ".join(summary.get("key_decisions", [])),
+                    " ".join(summary.get("open_threads", [])),
+                ],
+            )
+        )
         topic_tokens = set(_tokenize(search_text))
 
         overlap = query_set & topic_tokens
@@ -410,25 +443,32 @@ def _search_l2_topics(query_tokens: list[str], limit: int = 5) -> list[dict]:
             continue
         score = round(len(overlap) / len(query_set) * 100, 1)
 
-        hits.append({
-            "type": "project_topic",
-            "project": shorten_path(project_path),
-            "project_path": project_path,
-            "topic": topic_name,
-            "score": score,
-            "matched_terms": sorted(overlap),
-            "status": summary.get("status", ""),
-            "narrative": (summary.get("narrative", "") or "")[:200],
-            "updated_at": updated_at,
-        })
+        hits.append(
+            {
+                "type": "project_topic",
+                "project": shorten_path(project_path),
+                "project_path": project_path,
+                "topic": topic_name,
+                "score": score,
+                "matched_terms": sorted(overlap),
+                "status": summary.get("status", ""),
+                "narrative": (summary.get("narrative", "") or "")[:200],
+                "updated_at": updated_at,
+            }
+        )
 
     hits.sort(key=lambda x: x["score"], reverse=True)
     return hits[:limit]
 
 
 @mcp.tool()
-def search_sessions(query: str, limit: int = 10, include_automated: bool = False,
-                    hours: int = 0, project: str = "") -> dict:
+def search_sessions(
+    query: str,
+    limit: int = 10,
+    include_automated: bool = False,
+    hours: int = 0,
+    project: str = "",
+) -> dict:
     """Search Claude Code sessions by keywords.
 
     Uses a two-tier search path:
@@ -466,7 +506,7 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     # Parse query: support quoted phrases and individual terms
     phrases = re.findall(r'"([^"]+)"', query)
-    remaining = re.sub(r'"[^"]*"', '', query).strip()
+    remaining = re.sub(r'"[^"]*"', "", query).strip()
     words = [w for w in remaining.lower().split() if w]
 
     # Build search terms: phrases stay intact, words are individual
@@ -501,7 +541,9 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     if project:
         project_lower = project.lower()
-        hot_sessions = [s for s in hot_sessions if project_lower in s.get("project_dir", "").lower()]
+        hot_sessions = [
+            s for s in hot_sessions if project_lower in s.get("project_dir", "").lower()
+        ]
 
     p_ctx = progress(f"search: {query}")
     p = p_ctx.__enter__()
@@ -540,12 +582,15 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
 
     hot_matches.sort(key=lambda x: (x[1], x[0]["mtime"]), reverse=True)
     hot_results = [
-        _session_row(s, {
-            "score": round(100.0 * math.exp(-0.0002 * max(now - s["mtime"], 0)), 1),
-            "hits": total_count,
-            "snippet": snippet,
-            "source": "hot-live",
-        })
+        _session_row(
+            s,
+            {
+                "score": round(100.0 * math.exp(-0.0002 * max(now - s["mtime"], 0)), 1),
+                "hits": total_count,
+                "snippet": snippet,
+                "source": "hot-live",
+            },
+        )
         for s, total_count, snippet in hot_matches[:limit]
     ]
 
@@ -570,23 +615,27 @@ def search_sessions(query: str, limit: int = 10, include_automated: bool = False
     for row in cold_rows:
         if row["session_id"] in hot_ids:
             continue
-        cold_results.append({
-            "id": row["session_id"],
-            "project": shorten_path(row.get("project_dir") or ""),
-            "date": datetime.fromtimestamp(row["mtime"]).strftime("%Y-%m-%d %H:%M"),
-            "title": row.get("title") or "",
-            "health": round(float(row.get("score") or 0.0), 0),
-            "score": round(abs(float(row.get("rank") or 0.0)), 3),
-            "hits": None,
-            "snippet": row.get("state") or "",
-            "source": "cold-index",
-        })
+        cold_results.append(
+            {
+                "id": row["session_id"],
+                "project": shorten_path(row.get("project_dir") or ""),
+                "date": datetime.fromtimestamp(row["mtime"]).strftime("%Y-%m-%d %H:%M"),
+                "title": row.get("title") or "",
+                "health": round(float(row.get("score") or 0.0), 0),
+                "score": round(abs(float(row.get("rank") or 0.0)), 3),
+                "hits": None,
+                "snippet": row.get("state") or "",
+                "source": "cold-index",
+            }
+        )
 
     results = hot_results + cold_results
     for item in results:
         item["tool"] = session_tool(item["id"])  # "claude" | "codex"
 
-    p.update(f"{len(hot_results)} hot + {len(cold_results)} indexed results", icon="done")
+    p.update(
+        f"{len(hot_results)} hot + {len(cold_results)} indexed results", icon="done"
+    )
 
     time.sleep(0.1)  # let socket flush before closing
     p_ctx.__exit__(None, None, None)
@@ -606,7 +655,9 @@ def session_search_index_status() -> dict:
 
 
 @mcp.tool()
-def session_search_index_refresh(max_files: int = 200, max_seconds: float = 0.25) -> dict:
+def session_search_index_refresh(
+    max_files: int = 200, max_seconds: float = 0.25
+) -> dict:
     """Index a small cold-search batch without hammering the computer.
 
     This is intentionally budgeted. Repeated calls slowly move the cursor
@@ -727,17 +778,22 @@ def _read_messages(session_file: Path, keyword: str, limit: int) -> dict:
     if keyword:
         result["filter"] = keyword
         if total == 0:
-            result["note"] = "Keyword not found in user/assistant messages. It may appear in tool calls or system entries. Try without keyword to see all messages."
+            result["note"] = (
+                "Keyword not found in user/assistant messages. It may appear in tool calls or system entries. Try without keyword to see all messages."
+            )
     return result
 
 
 _RECENT_SESSIONS_CACHE: dict = {}
-_RECENT_SESSIONS_CACHE_TTL = 30.0  # seconds — long enough to survive slow first calls under load
+_RECENT_SESSIONS_CACHE_TTL = (
+    30.0  # seconds — long enough to survive slow first calls under load
+)
 
 
 @mcp.tool()
-def recent_sessions(hours: int = 24, limit: int = 10, project: str = "",
-                    include_automated: bool = False) -> dict:
+def recent_sessions(
+    hours: int = 24, limit: int = 10, project: str = "", include_automated: bool = False
+) -> dict:
     """List recently active Claude Code sessions, newest first.
 
     Use this for: "show me recent sessions", "what sessions ran today".
@@ -764,7 +820,11 @@ def recent_sessions(hours: int = 24, limit: int = 10, project: str = "",
     now = time.time()
     cached = _RECENT_SESSIONS_CACHE.get(cache_key)
     if cached and (now - cached["ts"]) < _RECENT_SESSIONS_CACHE_TTL:
-        return {**cached["data"], "cached": True, "cache_age_s": round(now - cached["ts"], 1)}
+        return {
+            **cached["data"],
+            "cached": True,
+            "cache_age_s": round(now - cached["ts"], 1),
+        }
 
     # Fetch enough sessions to have headroom after filtering.
     # Fetching ALL sessions (max_sessions=0) is too expensive under load.
@@ -773,12 +833,15 @@ def recent_sessions(hours: int = 24, limit: int = 10, project: str = "",
 
     if not include_automated:
         from .session_utils import filter_automated
+
         cache_index = _get_cache_index()
         sessions = filter_automated(sessions, cache_index)
 
     if project:
         project_lower = project.lower()
-        sessions = [s for s in sessions if project_lower in s.get("project_dir", "").lower()]
+        sessions = [
+            s for s in sessions if project_lower in s.get("project_dir", "").lower()
+        ]
 
     sessions = sessions[:limit]
     ci = _get_cache_index() if not include_automated else None
@@ -789,8 +852,9 @@ def recent_sessions(hours: int = 24, limit: int = 10, project: str = "",
 
 
 @mcp.tool()
-def session_summary(session_id: str, force_regenerate: bool = False,
-                    depth: str = "auto") -> dict:
+def session_summary(
+    session_id: str, force_regenerate: bool = False, depth: str = "auto"
+) -> dict:
     """Get or generate an AI summary for a session.
 
     depth controls summarization tier:
@@ -819,19 +883,31 @@ def session_summary(session_id: str, force_regenerate: bool = False,
         cached = _cache.get(session_id, ck, "summary")
         if not cached:
             data = _cache._read(session_id)
-            cached = data.get("summary") if isinstance(data.get("summary"), dict) else None
+            cached = (
+                data.get("summary") if isinstance(data.get("summary"), dict) else None
+            )
         if cached and _summary_valid(cached):
             # If auto and cached tier is already deep/insight, return it
             cached_tier = cached.get("_tier", 1)
             if depth == "auto" or cached_tier >= 1:
-                return {"id": session_id, "source": "cache", "tier": cached_tier, **cached}
+                return {
+                    "id": session_id,
+                    "source": "cache",
+                    "tier": cached_tier,
+                    **cached,
+                }
 
     # deep/insight: check their own cache keys
     if depth in ("deep", "insight") and not force_regenerate:
         cache_key = f"summary_{depth}"
         cached = _cache.get(session_id, ck, cache_key)
         if cached and _summary_valid(cached):
-            return {"id": session_id, "source": "cache", "tier": 2 if depth == "deep" else 3, **cached}
+            return {
+                "id": session_id,
+                "source": "cache",
+                "tier": 2 if depth == "deep" else 3,
+                **cached,
+            }
 
     # Need to generate — always synchronous for tier 2/3 (too heavy for daemon queue)
     context, search_text = parse_session(session_file)
@@ -871,7 +947,9 @@ def session_summary(session_id: str, force_regenerate: bool = False,
     else:  # tier == 3
         quick = summarize_quick(context, session["project_dir"], git)
         deep = summarize_deep(context, session["project_dir"], quick, git)
-        summary = summarize_insight(context, session["project_dir"], deep, git, file_size)
+        summary = summarize_insight(
+            context, session["project_dir"], deep, git, file_size
+        )
         summary["_tier"] = 3
         _cache.set(session_id, ck, "summary_insight", summary)
         _cache.set(session_id, ck, "summary_deep", deep)
@@ -901,7 +979,10 @@ def _scan_repo_git(repo_path: str) -> dict | None:
         # Combined: status + branch in one call
         status = subprocess.run(
             ["git", "status", "--porcelain", "-b"],
-            capture_output=True, text=True, timeout=5, cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=repo,
         )
         lines = status.stdout.splitlines()
 
@@ -935,7 +1016,10 @@ def _scan_repo_git(repo_path: str) -> dict | None:
         # Dirty repo — fetch recent commits and mtimes
         log = subprocess.run(
             ["git", "log", "--oneline", "-3", "--format=%h %ar %s"],
-            capture_output=True, text=True, timeout=5, cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=repo,
         )
         recent_commits = [
             line.strip() for line in log.stdout.splitlines() if line.strip()
@@ -1053,7 +1137,9 @@ def _extract_crash_context(session_file: Path) -> dict:
                                             or ""
                                         )
                                         if label:
-                                            result["last_tool"] = f"{name}: {label}"[:120]
+                                            result["last_tool"] = f"{name}: {label}"[
+                                                :120
+                                            ]
                                         else:
                                             result["last_tool"] = name
                                     else:
@@ -1111,14 +1197,15 @@ def boot_up(hours: int = 24) -> dict:
     # 1. Find all sessions; split into recent (time-windowed) and all (for repo discovery)
     all_sessions = _find_all_sessions_cached()
     recent = [s for s in all_sessions if s["mtime"] >= cutoff]
-    p.update(f"{len(recent)} recent sessions (last {hours}h), {len(all_sessions)} total", icon="search")
+    p.update(
+        f"{len(recent)} recent sessions (last {hours}h), {len(all_sessions)} total",
+        icon="search",
+    )
 
     # 2. Find currently running claude processes and extract session IDs
     running_ids = set()
     try:
-        ps = subprocess.run(
-            ["ps", "aux"], capture_output=True, text=True, timeout=5
-        )
+        ps = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
         for line in ps.stdout.splitlines():
             if "--resume" in line:
                 m = _UUID_RE.search(line)
@@ -1151,10 +1238,13 @@ def boot_up(hours: int = 24) -> dict:
         if pd and pd != str(Path.home()) and Path(pd).exists():
             project_dirs.add(pd)
 
-    p.update(f"Scanning {len(project_dirs)} repos for dirty git state...", icon="working")
+    p.update(
+        f"Scanning {len(project_dirs)} repos for dirty git state...", icon="working"
+    )
 
     # 5. Scan repos for dirty git state (parallel, with timeout budget)
     from concurrent.futures import as_completed as _as_completed
+
     dirty_repos = {}
     repo_scan_results = {}
     repo_total = len(project_dirs)
@@ -1167,7 +1257,10 @@ def boot_up(hours: int = 24) -> dict:
             pct = int((repo_checked / repo_total) * 100) if repo_total else 100
             if pct >= repo_last_pct + 20 or repo_checked == repo_total:
                 repo_last_pct = pct
-                p.update(f"Git: {repo_checked}/{repo_total} repos, {len(dirty_repos)} dirty", icon="working")
+                p.update(
+                    f"Git: {repo_checked}/{repo_total} repos, {len(dirty_repos)} dirty",
+                    icon="working",
+                )
             try:
                 result = future.result(timeout=10)
                 pd = futures[future]
@@ -1196,7 +1289,6 @@ def boot_up(hours: int = 24) -> dict:
     sessions = []
     session_project_dirs = set()  # track which repos have sessions
     for sid, s in candidates.items():
-
         # Skip currently running sessions
         if sid in running_ids:
             continue
@@ -1206,7 +1298,10 @@ def boot_up(hours: int = 24) -> dict:
 
         # Clean exits — skip (UNLESS the repo is still dirty)
         repo_is_dirty = s["project_dir"] in dirty_repos
-        if lifecycle in ("done", "paused", "blocked", "handing-off") and not repo_is_dirty:
+        if (
+            lifecycle in ("done", "paused", "blocked", "handing-off")
+            and not repo_is_dirty
+        ):
             continue
 
         # Age filters: bypass if repo is dirty — uncommitted work doesn't age out
@@ -1255,8 +1350,15 @@ def boot_up(hours: int = 24) -> dict:
 
         repo_urgency = 0.0
         if repo_state and repo_state["dirty"]:
-            file_score = min(repo_state.get("dirty_file_count", len(repo_state["dirty_files"])) / 15, 1.0)
-            dirty_age = max(now - repo_state["latest_dirty_mtime"], 0) if repo_state.get("latest_dirty_mtime") else now
+            file_score = min(
+                repo_state.get("dirty_file_count", len(repo_state["dirty_files"])) / 15,
+                1.0,
+            )
+            dirty_age = (
+                max(now - repo_state["latest_dirty_mtime"], 0)
+                if repo_state.get("latest_dirty_mtime")
+                else now
+            )
             dirty_recency = math.exp(-math.log(2) / (24 * 3600) * dirty_age)
             repo_urgency = 0.5 * file_score + 0.5 * dirty_recency
 
@@ -1268,7 +1370,11 @@ def boot_up(hours: int = 24) -> dict:
 
         # Filter noise: ~ home sessions with no context and no dirty files
         project_short = shorten_path(s["project_dir"])
-        if project_short == "~" and not dirty and "Last message:" not in context_summary:
+        if (
+            project_short == "~"
+            and not dirty
+            and "Last message:" not in context_summary
+        ):
             if context_summary == "Session closed without explicit bookmark":
                 continue
 
@@ -1308,7 +1414,11 @@ def boot_up(hours: int = 24) -> dict:
     sessions.sort(key=lambda x: x["score"], reverse=True)
     p.update(f"{len(sessions)} sessions need attention", icon="done", highlight=True)
     for s in sessions[:5]:
-        p.result(s["summary"][:60], f"{s['project']} | {s['state']} | {s['date']}", session_id=s["id"])
+        p.result(
+            s["summary"][:60],
+            f"{s['project']} | {s['state']} | {s['date']}",
+            session_id=s["id"],
+        )
 
     # 7. Build the full dirty repos list — this is the "what needs attention" view.
     #    Dirty doesn't age out. This list only shrinks by committing.
@@ -1357,7 +1467,11 @@ def dirty_repos() -> dict:
     now = time.time()
     cached = _DIRTY_REPOS_CACHE["data"]
     if cached is not None and (now - _DIRTY_REPOS_CACHE["ts"]) < _DIRTY_REPOS_CACHE_TTL:
-        return {**cached, "cached": True, "cache_age_s": round(now - _DIRTY_REPOS_CACHE["ts"], 1)}
+        return {
+            **cached,
+            "cached": True,
+            "cache_age_s": round(now - _DIRTY_REPOS_CACHE["ts"], 1),
+        }
 
     all_sessions = _find_all_sessions_cached()
 
@@ -1403,7 +1517,9 @@ def dirty_repos() -> dict:
     max_files = max((len(d["dirty_files"]) for d in dirty), default=1)
     for d in dirty:
         file_score = len(d["dirty_files"]) / max_files  # 0-1
-        age_s = max(now - d["latest_dirty_mtime"], 0) if d["latest_dirty_mtime"] else now
+        age_s = (
+            max(now - d["latest_dirty_mtime"], 0) if d["latest_dirty_mtime"] else now
+        )
         recency_score = math.exp(-_DIRTY_LAMBDA * age_s)  # 0-1
         d["urgency"] = round(0.5 * file_score + 0.5 * recency_score, 3)
 
@@ -1414,7 +1530,9 @@ def dirty_repos() -> dict:
     repo_to_session: dict[str, dict] = {}
     for s in all_sessions:
         pd = s.get("project_dir", "")
-        if pd and (pd not in repo_to_session or s["mtime"] > repo_to_session[pd]["mtime"]):
+        if pd and (
+            pd not in repo_to_session or s["mtime"] > repo_to_session[pd]["mtime"]
+        ):
             repo_to_session[pd] = s
     for d in dirty:
         full_path = next(
@@ -1424,7 +1542,9 @@ def dirty_repos() -> dict:
         if full_path:
             s = repo_to_session[full_path]
             d["last_session_id"] = s["session_id"]
-            d["last_session_date"] = datetime.fromtimestamp(s["mtime"]).strftime("%Y-%m-%d %H:%M")
+            d["last_session_date"] = datetime.fromtimestamp(s["mtime"]).strftime(
+                "%Y-%m-%d %H:%M"
+            )
 
     result = {
         "dirty": dirty,
@@ -1449,10 +1569,14 @@ def _launch_terminal(project_dir: str, command: str) -> dict | None:
     import platform
 
     if platform.system() != "Darwin":
-        return {"error": "Terminal launch requires macOS. Run manually.", "command": command, "directory": project_dir}
+        return {
+            "error": "Terminal launch requires macOS. Run manually.",
+            "command": command,
+            "directory": project_dir,
+        }
 
     # Try iTerm2 first
-    iterm_script = f'''
+    iterm_script = f"""
     tell application "iTerm2"
         activate
         set newWindow to (create window with default profile)
@@ -1461,11 +1585,13 @@ def _launch_terminal(project_dir: str, command: str) -> dict | None:
             write text {json.dumps(command)}
         end tell
     end tell
-    '''
+    """
     try:
         result = subprocess.run(
             ["osascript", "-e", iterm_script],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             return None
@@ -1473,20 +1599,26 @@ def _launch_terminal(project_dir: str, command: str) -> dict | None:
         pass
 
     # Fall back to Terminal.app
-    terminal_script = f'''
+    terminal_script = f"""
     tell application "Terminal"
         activate
         do script "cd {project_dir} && {command}"
     end tell
-    '''
+    """
     try:
         subprocess.run(
             ["osascript", "-e", terminal_script],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return None
     except (subprocess.TimeoutExpired, OSError) as e:
-        return {"error": f"Failed to launch terminal: {e}", "command": command, "directory": project_dir}
+        return {
+            "error": f"Failed to launch terminal: {e}",
+            "command": command,
+            "directory": project_dir,
+        }
 
 
 @mcp.tool()
@@ -1560,7 +1692,9 @@ def merge_context(
         summary = _cache.get(session_id, ck, "summary")
         if not summary:
             data = _cache._read(session_id)
-            summary = data.get("summary") if isinstance(data.get("summary"), dict) else None
+            summary = (
+                data.get("summary") if isinstance(data.get("summary"), dict) else None
+            )
 
     # --- Gather messages ---
     msgs = None
@@ -1574,7 +1708,9 @@ def merge_context(
 
     # --- Gather bookmark ---
     bookmark = None
-    bookmark_file = Path.home() / ".claude" / "bookmarks" / f"{session_id}-bookmark.json"
+    bookmark_file = (
+        Path.home() / ".claude" / "bookmarks" / f"{session_id}-bookmark.json"
+    )
     if bookmark_file.exists():
         try:
             bm = json.loads(bookmark_file.read_text())
@@ -1621,7 +1757,9 @@ def merge_context(
         if bookmark.get("next_actions"):
             lines.append("**Planned Actions:** " + "; ".join(bookmark["next_actions"]))
         if bookmark.get("uncommitted_files"):
-            lines.append(f"**Uncommitted Files:** {', '.join(bookmark['uncommitted_files'])}")
+            lines.append(
+                f"**Uncommitted Files:** {', '.join(bookmark['uncommitted_files'])}"
+            )
 
     # Crash context: if no summary and no bookmark, show what Claude was
     # doing when the session ended — last tool, last assistant message,
@@ -1634,7 +1772,9 @@ def merge_context(
             if crash_ctx.get("last_tool"):
                 lines.append(f"**Last Tool:** {crash_ctx['last_tool']}")
             if crash_ctx.get("last_assistant_msg"):
-                lines.append(f"**Claude was saying:** {crash_ctx['last_assistant_msg']}")
+                lines.append(
+                    f"**Claude was saying:** {crash_ctx['last_assistant_msg']}"
+                )
             if crash_ctx.get("duration_estimate"):
                 lines.append(f"**Session Duration:** {crash_ctx['duration_estimate']}")
             if crash_ctx.get("message_count"):
@@ -1669,7 +1809,9 @@ def merge_context(
     if keyword:
         result["keyword_filter"] = keyword
     if summary is None and mode in ("summary", "hybrid"):
-        result["note"] = "No cached summary. Call session_summary() first for richer context, or use mode='messages'."
+        result["note"] = (
+            "No cached summary. Call session_summary() first for richer context, or use mode='messages'."
+        )
 
     return result
 
@@ -1739,8 +1881,8 @@ def session_timeline(
         if focus == "recent":
             tail_count = int(limit * 0.7)
             head_count = limit - tail_count
-            head_events = deduped[:len(deduped) - tail_count]
-            tail_events = deduped[len(deduped) - tail_count:]
+            head_events = deduped[: len(deduped) - tail_count]
+            tail_events = deduped[len(deduped) - tail_count :]
             if len(head_events) > head_count and head_count > 0:
                 step = len(head_events) / head_count
                 head_events = [head_events[int(i * step)] for i in range(head_count)]
@@ -1851,11 +1993,13 @@ def _parse_event_lines(lines: list[str]) -> list[dict]:
         if isinstance(tur, dict) and tur.get("type") in ("create", "update"):
             fp = tur.get("filePath", "")
             if fp:
-                events.append({
-                    "time": ts,
-                    "type": "file_" + tur["type"],
-                    "detail": shorten_path(fp),
-                })
+                events.append(
+                    {
+                        "time": ts,
+                        "type": "file_" + tur["type"],
+                        "detail": shorten_path(fp),
+                    }
+                )
             continue
 
         # 2. Tool use entries — significant tool calls
@@ -1870,31 +2014,39 @@ def _parse_event_lines(lines: list[str]) -> list[dict]:
                         if name == "Bash":
                             cmd = inp.get("command", "")
                             if "git commit" in cmd:
-                                events.append({
-                                    "time": ts,
-                                    "type": "git_commit",
-                                    "detail": _trunc(cmd, 120),
-                                })
+                                events.append(
+                                    {
+                                        "time": ts,
+                                        "type": "git_commit",
+                                        "detail": _trunc(cmd, 120),
+                                    }
+                                )
                             elif "git push" in cmd:
-                                events.append({
-                                    "time": ts,
-                                    "type": "git_push",
-                                    "detail": _trunc(cmd, 120),
-                                })
+                                events.append(
+                                    {
+                                        "time": ts,
+                                        "type": "git_push",
+                                        "detail": _trunc(cmd, 120),
+                                    }
+                                )
                         elif name == "Write":
                             fp = inp.get("file_path", "")
                             if fp:
-                                events.append({
-                                    "time": ts,
-                                    "type": "file_write",
-                                    "detail": shorten_path(fp),
-                                })
+                                events.append(
+                                    {
+                                        "time": ts,
+                                        "type": "file_write",
+                                        "detail": shorten_path(fp),
+                                    }
+                                )
                         elif name.startswith("mcp__"):
-                            events.append({
-                                "time": ts,
-                                "type": "mcp_call",
-                                "detail": name,
-                            })
+                            events.append(
+                                {
+                                    "time": ts,
+                                    "type": "mcp_call",
+                                    "detail": name,
+                                }
+                            )
             continue
 
         # 3. User text messages
@@ -1902,11 +2054,13 @@ def _parse_event_lines(lines: list[str]) -> list[dict]:
             msg = entry.get("message", {})
             content = msg.get("content", "")
             if isinstance(content, str) and len(content.strip()) > 5:
-                events.append({
-                    "time": ts,
-                    "type": "user_message",
-                    "detail": _trunc(content.strip(), 150),
-                })
+                events.append(
+                    {
+                        "time": ts,
+                        "type": "user_message",
+                        "detail": _trunc(content.strip(), 150),
+                    }
+                )
 
     return events
 
@@ -1935,8 +2089,7 @@ def _extract_events(session_file: Path) -> list[dict] | dict:
     n_chunks = 4
     chunk_size = max(1, len(all_lines) // n_chunks)
     chunks = [
-        all_lines[i:i + chunk_size]
-        for i in range(0, len(all_lines), chunk_size)
+        all_lines[i : i + chunk_size] for i in range(0, len(all_lines), chunk_size)
     ]
 
     with ThreadPoolExecutor(max_workers=n_chunks) as pool:
@@ -1947,8 +2100,6 @@ def _extract_events(session_file: Path) -> list[dict] | dict:
     for chunk_events in results:
         events.extend(chunk_events)
     return events
-
-
 
 
 @mcp.tool()
@@ -2055,7 +2206,11 @@ def _find_merged_ids(session_file: Path) -> set[str]:
                 # Check user text for session IDs near "resume" or "continued"
                 if isinstance(content, str):
                     lower = content.lower()
-                    if "continued from" in lower or "resume" in lower or "bookmark" in lower:
+                    if (
+                        "continued from" in lower
+                        or "resume" in lower
+                        or "bookmark" in lower
+                    ):
                         for m in _UUID_RE.finditer(content):
                             merged.add(m.group())
     except OSError:
@@ -2078,9 +2233,15 @@ def _trace_merges(session_file: Path, chain: list, visited: set) -> None:
 
 def _register_data_science_stubs(mcp_instance) -> None:
     """Register data-science placeholder tools when optional deps are absent."""
-    ds_tools = ["session_insights", "session_xray", "session_report", "session_data_science"]
+    ds_tools = [
+        "session_insights",
+        "session_xray",
+        "session_report",
+        "session_data_science",
+    ]
 
     for tool_name in ds_tools:
+
         def _make_stub(name):
             @mcp_instance.tool(name=name)
             def _stub() -> dict:
@@ -2089,13 +2250,16 @@ def _register_data_science_stubs(mcp_instance) -> None:
                     "install_cmd": "pip install resume-resume[train]",
                     "missing": "scipy, scikit-learn, pandas",
                 }
+
             return _stub
+
         _make_stub(tool_name)
 
 
 # Register data science tools on the same MCP instance (optional — requires scipy/sklearn)
 try:
     from .data_science.mcp_tools import register_tools as _register_ds_tools
+
     _register_ds_tools(mcp)
 except Exception:
     _register_data_science_stubs(mcp)
@@ -2103,6 +2267,7 @@ except Exception:
 # Register L2/L3 project summary tools (requires insights.db from commons daemon)
 try:
     from .l2_tools import register_l2_tools
+
     register_l2_tools(mcp)
 except ImportError:
     pass
@@ -2113,6 +2278,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 from .self_tools import register_self_tools as _register_self_tools
+
 _register_self_tools(mcp)
 
 

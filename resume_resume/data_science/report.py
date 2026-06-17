@@ -4,7 +4,6 @@ Self-contained HTML with embedded SVG charts, cluster plots, heatmaps,
 Markov diagrams, distribution charts, and animated transitions.
 """
 
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -32,11 +31,21 @@ def _svg_scatter(points_2d, labels, clusters, width=500, height=350):
         return "<p>No cluster data</p>"
 
     import numpy as np
+
     pts = np.array(points_2d)
     if len(pts) == 0:
         return ""
 
-    colors = ["#6366f1", "#22c55e", "#f59e0b", "#f43f5e", "#06b6d4", "#a855f7", "#ec4899", "#14b8a6"]
+    colors = [
+        "#6366f1",
+        "#22c55e",
+        "#f59e0b",
+        "#f43f5e",
+        "#06b6d4",
+        "#a855f7",
+        "#ec4899",
+        "#14b8a6",
+    ]
     margin = 40
     pw = width - 2 * margin
     ph = height - 2 * margin
@@ -48,14 +57,20 @@ def _svg_scatter(points_2d, labels, clusters, width=500, height=350):
 
     # Sample points for performance (max 800)
     sample_size = min(800, len(pts))
-    indices = np.random.choice(len(pts), sample_size, replace=False) if len(pts) > sample_size else np.arange(len(pts))
+    indices = (
+        np.random.choice(len(pts), sample_size, replace=False)
+        if len(pts) > sample_size
+        else np.arange(len(pts))
+    )
 
     dots = []
     for i in indices:
         x = margin + (pts[i, 0] - x_min) / x_range * pw
         y = margin + (1 - (pts[i, 1] - y_min) / y_range) * ph
         c = colors[labels[i] % len(colors)] if labels[i] >= 0 else "#555"
-        dots.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="{c}" opacity="0.6"/>')
+        dots.append(
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="{c}" opacity="0.6"/>'
+        )
 
     # Cluster centroids
     centroids = []
@@ -95,8 +110,10 @@ def _svg_circadian(actual, fitted, width=600, height=250):
         h = v / mx * ph
         x = margin + i * (bar_w + 2)
         y = margin + ph - h
-        bars.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
-                    f'rx="2" fill="#6366f1" opacity="0.4"/>')
+        bars.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
+            f'rx="2" fill="#6366f1" opacity="0.4"/>'
+        )
 
     # Fitted curve
     points = []
@@ -110,7 +127,9 @@ def _svg_circadian(actual, fitted, width=600, height=250):
     labels = []
     for i in range(0, 24, 3):
         x = margin + i * (bar_w + 2) + bar_w / 2
-        labels.append(f'<text x="{x:.1f}" y="{margin + ph + 20}" text-anchor="middle" fill="#8888a0" font-size="11">{i:02d}</text>')
+        labels.append(
+            f'<text x="{x:.1f}" y="{margin + ph + 20}" text-anchor="middle" fill="#8888a0" font-size="11">{i:02d}</text>'
+        )
 
     return f'''<svg width="{width}" height="{height}">
         <rect width="{width}" height="{height}" rx="12" fill="#12121a"/>
@@ -130,6 +149,7 @@ def _svg_markov(transitions, width=600, height=400):
         return ""
 
     import math
+
     nodes = set()
     for t in transitions[:12]:
         nodes.add(t["from"])
@@ -199,8 +219,10 @@ def _svg_histogram(bins, counts, width=500, height=200):
         h = c / mx * ph
         x = margin + i * (bar_w + 1)
         y = margin + ph - h
-        bars.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
-                    f'rx="1" fill="#06b6d4" opacity="0.7"/>')
+        bars.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
+            f'rx="1" fill="#06b6d4" opacity="0.7"/>'
+        )
 
     return f'''<svg width="{width}" height="{height}">
         <rect width="{width}" height="{height}" rx="12" fill="#12121a"/>
@@ -211,6 +233,7 @@ def _svg_histogram(bins, counts, width=500, height=200):
 def _svg_entropy_gauge(value, label, width=160, height=160):
     """SVG radial gauge for entropy normalized value (0-1)."""
     import math
+
     cx, cy, r = width / 2, height / 2 + 10, 55
     circumference = 2 * math.pi * r
     filled = circumference * value
@@ -226,7 +249,9 @@ def _svg_entropy_gauge(value, label, width=160, height=160):
     </svg>'''
 
 
-def generate_report(output_path: str | None = None, max_sessions: int = 0, org: str = "") -> str:
+def generate_report(
+    output_path: str | None = None, max_sessions: int = 0, org: str = ""
+) -> str:
     """Generate comprehensive HTML report with real data science.
 
     Args:
@@ -262,21 +287,22 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     # Cluster scatter
     cl = ds.get("clustering", {})
     cluster_svg = _svg_scatter(
-        cl.get("points_2d", []), cl.get("labels", []),
-        cl.get("clusters", [])
+        cl.get("points_2d", []), cl.get("labels", []), cl.get("clusters", [])
     )
     cluster_cards = ""
     for c in cl.get("clusters", [])[:7]:
-        cluster_cards += f'''
+        cluster_cards += f"""
         <div class="cluster-card">
             <div class="cluster-label">{c["label"]}</div>
             <div class="cluster-pct">{c["pct"]}%</div>
             <div class="cluster-meta">{c["count"]} sessions · {c["avg_duration_mins"]}min avg · {c["avg_tool_calls"]} tools/session</div>
-        </div>'''
+        </div>"""
 
     # Circadian
     circ = ds.get("circadian", {})
-    circadian_svg = _svg_circadian(circ.get("actual_hourly", []), circ.get("fitted_hourly", []))
+    circadian_svg = _svg_circadian(
+        circ.get("actual_hourly", []), circ.get("fitted_hourly", [])
+    )
 
     # Markov
     mk = ds.get("markov_chain", {})
@@ -313,9 +339,9 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     day_ent = ent.get("day_entropy", {})
 
     entropy_gauges = (
-        _svg_entropy_gauge(proj_ent.get("normalized", 0), "Project") +
-        _svg_entropy_gauge(hour_ent.get("normalized", 0), "Hour") +
-        _svg_entropy_gauge(day_ent.get("normalized", 0), "Day")
+        _svg_entropy_gauge(proj_ent.get("normalized", 0), "Project")
+        + _svg_entropy_gauge(hour_ent.get("normalized", 0), "Hour")
+        + _svg_entropy_gauge(day_ent.get("normalized", 0), "Day")
     )
 
     # --- Generate 40 charts ---
@@ -403,13 +429,13 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     anomaly_rows = ""
     for a in an.get("anomalies", [])[:8]:
         reasons_str = ", ".join(a.get("reasons", []))
-        anomaly_rows += f'''
+        anomaly_rows += f"""
         <div class="anomaly-row">
             <span class="anomaly-project">{a["project"]}</span>
             <span class="anomaly-date">{a["date"]}</span>
             <span class="anomaly-dur">{a["duration_mins"]}min</span>
             <span class="anomaly-reasons">{reasons_str}</span>
-        </div>'''
+        </div>"""
 
     # Project bars (from descriptive)
     top_proj = proj.get("top_projects", [])
@@ -417,12 +443,12 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     project_rows = ""
     for p in top_proj[:12]:
         pct = p["sessions"] / max_proj_sessions * 100
-        project_rows += f'''
+        project_rows += f"""
         <div class="proj-row">
             <div class="proj-name">{p["project"]}</div>
             <div class="proj-bar-track"><div class="proj-bar" style="width:{pct}%"></div></div>
             <div class="proj-stats"><span class="proj-num">{p["sessions"]}</span> · {p["hours"]}h · {p["tokens"]}</div>
-        </div>'''
+        </div>"""
 
     # Tool bars
     top_tools = tools_data.get("top_tools", [])[:12]
@@ -430,12 +456,12 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     tool_rows = ""
     for t in top_tools:
         pct = t["uses"] / max_tool * 100
-        tool_rows += f'''
+        tool_rows += f"""
         <div class="tool-row">
             <div class="tool-name">{t["tool"]}</div>
             <div class="tool-bar-track"><div class="tool-bar" style="width:{pct}%"></div></div>
             <div class="tool-count">{t["uses"]:,}</div>
-        </div>'''
+        </div>"""
 
     # Personality
     trait_icons = ["🦉", "⚡", "🔀", "🧠", "🎯", "💻", "🌙", "🏗️", "🎭", "🔬"]
@@ -444,12 +470,12 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
         parts = trait.split(" — ", 1)
         title = parts[0]
         desc_text = parts[1] if len(parts) > 1 else ""
-        trait_cards += f'''
+        trait_cards += f"""
         <div class="trait-card">
             <div class="trait-icon">{trait_icons[i % len(trait_icons)]}</div>
             <div class="trait-title">{title}</div>
             <div class="trait-desc">{desc_text}</div>
-        </div>'''
+        </div>"""
 
     # Fun facts
     fact_cards = "".join(f'<div class="fact-card">{f}</div>' for f in fun)
@@ -459,12 +485,12 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     pred_rows = ""
     for p in preds.get("next_project", []):
         conf = int(p["confidence"].replace("%", ""))
-        pred_rows += f'''
+        pred_rows += f"""
         <div class="pred-row">
             <div class="pred-name">{p["project"]}</div>
             <div class="pred-bar-track"><div class="pred-bar" style="width:{conf}%"></div></div>
             <div class="pred-conf">{p["confidence"]}</div>
-        </div>'''
+        </div>"""
 
     # Weekly heatmap
     weekly = temp.get("weekly_pattern", {})
@@ -472,12 +498,12 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
     weekly_bars = ""
     for day, count in weekly.items():
         pct = count / max_weekly * 100
-        weekly_bars += f'''
+        weekly_bars += f"""
         <div class="week-bar-group">
             <div class="week-bar-container"><div class="week-bar" style="height:{pct}%"></div></div>
             <div class="week-label">{day[:3]}</div>
             <div class="week-count">{count}</div>
-        </div>'''
+        </div>"""
 
     # Hourly heatmap
     heatmap = temp.get("hourly_heatmap", {})
@@ -494,7 +520,7 @@ def generate_report(output_path: str | None = None, max_sessions: int = 0, org: 
         )
     heat_hours = "".join(f'<div class="heat-hour">{h:02d}</div>' for h in range(24))
 
-    html = f'''<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Claude Sessions — Data Science Report</title>
@@ -599,8 +625,14 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
 
 <div class="header">
     <h1>Claude Sessions: Data Science</h1>
-    <div class="sub">{f'<strong style="color:var(--a2)">{org.upper()}</strong> · ' if org else ''}{ov["total_sessions"]:,} sessions · {ov["total_projects"]} projects · {ov["date_range"]}</div>
-    <div class="gen">Generated {now} · K-Means · Markov Chains · Circadian Modeling · Power Law · DBSCAN · Shannon Entropy</div>
+    <div class="sub">{
+        f'<strong style="color:var(--a2)">{org.upper()}</strong> · ' if org else ""
+    }{ov["total_sessions"]:,} sessions · {ov["total_projects"]} projects · {
+        ov["date_range"]
+    }</div>
+    <div class="gen">Generated {
+        now
+    } · K-Means · Markov Chains · Circadian Modeling · Power Law · DBSCAN · Shannon Entropy</div>
 </div>
 
 <div class="streak-banner">
@@ -609,14 +641,28 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
 </div>
 
 <div class="stat-grid">
-    <div class="stat-card"><div class="stat-value">{ov["total_sessions"]:,}</div><div class="stat-label">Sessions</div></div>
-    <div class="stat-card"><div class="stat-value">{ov["active_days"]}</div><div class="stat-label">Active Days</div></div>
-    <div class="stat-card"><div class="stat-value">{ov["total_tokens"]}</div><div class="stat-label">Tokens</div></div>
-    <div class="stat-card"><div class="stat-value">{ov["novels_equivalent"]}</div><div class="stat-label">Novels Written</div></div>
-    <div class="stat-card"><div class="stat-value">${ov["estimated_cost_usd"]:,.0f}</div><div class="stat-label">Est. Cost</div></div>
-    <div class="stat-card"><div class="stat-value">{ov["total_tool_uses"]:,}</div><div class="stat-label">Tool Calls</div></div>
-    <div class="stat-card"><div class="stat-value">{ov["total_messages"]:,}</div><div class="stat-label">Messages</div></div>
-    <div class="stat-card"><div class="stat-value">{round(ent.get("overall_predictability", 0))}%</div><div class="stat-label">Predictability</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["total_sessions"]:,}</div><div class="stat-label">Sessions</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["active_days"]
+    }</div><div class="stat-label">Active Days</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["total_tokens"]
+    }</div><div class="stat-label">Tokens</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["novels_equivalent"]
+    }</div><div class="stat-label">Novels Written</div></div>
+    <div class="stat-card"><div class="stat-value">${
+        ov[
+            "estimated_cost_usd"
+        ]:,.0f}</div><div class="stat-label">Est. Cost</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["total_tool_uses"]:,}</div><div class="stat-label">Tool Calls</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        ov["total_messages"]:,}</div><div class="stat-label">Messages</div></div>
+    <div class="stat-card"><div class="stat-value">{
+        round(ent.get("overall_predictability", 0))
+    }%</div><div class="stat-label">Predictability</div></div>
 </div>
 
 <!-- DEVELOPER ARCHETYPE & PROWESS -->
@@ -689,13 +735,19 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
 
 <!-- CLUSTERING -->
 <div class="section">
-    <div class="section-title"><span class="icon">🔬</span> Session Clustering (K-Means, k={cl.get("n_clusters", "?")})</div>
-    <div class="insight">Silhouette score: {cl.get("silhouette_score", "?")} · {cl.get("variance_explained_2d", "?")}% variance explained in 2D PCA projection</div>
+    <div class="section-title"><span class="icon">🔬</span> Session Clustering (K-Means, k={
+        cl.get("n_clusters", "?")
+    })</div>
+    <div class="insight">Silhouette score: {cl.get("silhouette_score", "?")} · {
+        cl.get("variance_explained_2d", "?")
+    }% variance explained in 2D PCA projection</div>
     <div class="two-col">
         <div class="panel" style="text-align:center">{cluster_svg}</div>
         <div class="panel">
             <div class="label">Discovered Session Types</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">{cluster_cards}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">{
+        cluster_cards
+    }</div>
         </div>
     </div>
 </div>
@@ -703,7 +755,9 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
 <!-- CIRCADIAN -->
 <div class="section">
     <div class="section-title"><span class="icon">🌙</span> Circadian Rhythm Model</div>
-    <div class="insight">{circ.get("insight", "")}<br>Model fit: R²={circ.get("r_squared", "?")} ({circ.get("model_fit", "?")})</div>
+    <div class="insight">{circ.get("insight", "")}<br>Model fit: R²={
+        circ.get("r_squared", "?")
+    } ({circ.get("model_fit", "?")})</div>
     <div class="two-col">
         <div class="panel" style="text-align:center">
             <div class="label">Actual vs Sinusoidal Fit</div>
@@ -747,7 +801,12 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
         <div class="panel">
             <div class="label">Session Categories</div>
             <div class="record-grid" style="margin-top:12px">
-                {"".join(f'<div class="record-card"><div class="record-value">{v}</div><div class="record-label">{k}</div></div>' for k, v in categories.items())}
+                {
+        "".join(
+            f'<div class="record-card"><div class="record-value">{v}</div><div class="record-label">{k}</div></div>'
+            for k, v in categories.items()
+        )
+    }
             </div>
             <div style="margin-top:16px;font-size:.85rem;color:var(--t2)">
                 <strong>Pareto exponent α={pl.get("alpha", "?")}</strong><br>
@@ -764,7 +823,12 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
     <div class="insight">{fl.get("insight", "")}</div>
     <div class="panel">
         <div class="label">Flow Rate by Project</div>
-        {"".join(f'<div class="proj-row"><div class="proj-name">{p}</div><div class="proj-bar-track"><div class="proj-bar" style="width:{d["flow_rate"]}%"></div></div><div class="proj-stats">{d["flow_rate"]}% flow · {d["flow_sessions"]}/{d["total_sessions"]}</div></div>' for p, d in list(flow_projects.items())[:8])}
+        {
+        "".join(
+            f'<div class="proj-row"><div class="proj-name">{p}</div><div class="proj-bar-track"><div class="proj-bar" style="width:{d["flow_rate"]}%"></div></div><div class="proj-stats">{d["flow_rate"]}% flow · {d["flow_sessions"]}/{d["total_sessions"]}</div></div>'
+            for p, d in list(flow_projects.items())[:8]
+        )
+    }
     </div>
 </div>
 
@@ -786,37 +850,59 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
     <div class="panel">
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
             <div class="stat-value" style="font-size:2.5rem;{
-                "color:#22c55e" if bo.get("burnout_score",0) < 30 else
-                "color:#f59e0b" if bo.get("burnout_score",0) < 60 else "color:#f43f5e"
-            }">{bo.get("burnout_score", 0)}/100</div>
-            <div><div style="font-size:1.2rem;font-weight:700">{bo.get("risk_level", "?")}</div>
+        "color:#22c55e"
+        if bo.get("burnout_score", 0) < 30
+        else "color:#f59e0b"
+        if bo.get("burnout_score", 0) < 60
+        else "color:#f43f5e"
+    }">{bo.get("burnout_score", 0)}/100</div>
+            <div><div style="font-size:1.2rem;font-weight:700">{
+        bo.get("risk_level", "?")
+    }</div>
                 <div style="color:var(--t2);font-size:.85rem">Burnout Risk Score</div></div>
         </div>
-        <div class="burnout-meter"><div class="burnout-fill" style="width:{bo.get("burnout_score",0)}%;background:{
-            "#22c55e" if bo.get("burnout_score",0) < 30 else "#f59e0b" if bo.get("burnout_score",0) < 60 else "#f43f5e"
-        }"></div></div>
-        {"".join(f'<div class="insight" style="border-left-color:var(--r)">{s}</div>' for s in burnout_signals)}
+        <div class="burnout-meter"><div class="burnout-fill" style="width:{
+        bo.get("burnout_score", 0)
+    }%;background:{
+        "#22c55e"
+        if bo.get("burnout_score", 0) < 30
+        else "#f59e0b"
+        if bo.get("burnout_score", 0) < 60
+        else "#f43f5e"
+    }"></div></div>
+        {
+        "".join(
+            f'<div class="insight" style="border-left-color:var(--r)">{s}</div>'
+            for s in burnout_signals
+        )
+    }
     </div>
 </div>
 
 <!-- ANOMALIES -->
 <div class="section">
     <div class="section-title"><span class="icon">👾</span> Anomaly Detection (DBSCAN)</div>
-    <div class="insight">{an.get("total_anomalies", 0)} anomalous sessions detected ({an.get("anomaly_rate", 0)}% of total) — statistical outliers in duration, token usage, or tool intensity</div>
+    <div class="insight">{an.get("total_anomalies", 0)} anomalous sessions detected ({
+        an.get("anomaly_rate", 0)
+    }% of total) — statistical outliers in duration, token usage, or tool intensity</div>
     <div class="panel">{anomaly_rows}</div>
 </div>
 
 <!-- PROJECTS -->
 <div class="section">
     <div class="section-title"><span class="icon">📁</span> Projects</div>
-    <div class="insight">{proj.get("pareto", "")} · {proj.get("avg_context_switches_per_day", 0)} context switches/day</div>
+    <div class="insight">{proj.get("pareto", "")} · {
+        proj.get("avg_context_switches_per_day", 0)
+    } context switches/day</div>
     <div class="panel">{project_rows}</div>
 </div>
 
 <!-- TOOLS -->
 <div class="section">
     <div class="section-title"><span class="icon">🔧</span> Tool Usage</div>
-    <div class="insight">{tools_data.get("work_style", "")} · {tools_data.get("unique_tools", 0)} unique tools · {tools_data.get("read_write_ratio", "")}</div>
+    <div class="insight">{tools_data.get("work_style", "")} · {
+        tools_data.get("unique_tools", 0)
+    } unique tools · {tools_data.get("read_write_ratio", "")}</div>
     <div class="panel">{tool_rows}</div>
 </div>
 
@@ -957,7 +1043,9 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
         <div class="panel" style="text-align:center">{chart_tool_adopt}</div>
         <div class="panel" style="text-align:center">{chart_branch}</div>
     </div>
-    <div class="panel" style="text-align:center;display:flex;justify-content:center">{chart_model_donut}</div>
+    <div class="panel" style="text-align:center;display:flex;justify-content:center">{
+        chart_model_donut
+    }</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -1020,12 +1108,18 @@ body{{background:var(--bg);color:var(--t);font-family:'Inter',-apple-system,syst
     </div>
 </div>
 
-<div class="footer">Claude Sessions Data Science · {ov["total_sessions"]:,} sessions · {ov["data_size"]} ·
+<div class="footer">Claude Sessions Data Science · {ov["total_sessions"]:,} sessions · {
+        ov["data_size"]
+    } ·
 K-Means · DBSCAN · Markov · Sinusoidal Fit · Power Law · Shannon Entropy · Flow Detection · Prowess Assessment · FAANG Level · Bollinger Bands · 72 Visualizations</div>
-</div></body></html>'''
+</div></body></html>"""
 
     if output_path is None:
-        filename = f"claude-sessions-report-{org}.html" if org else "claude-sessions-report.html"
+        filename = (
+            f"claude-sessions-report-{org}.html"
+            if org
+            else "claude-sessions-report.html"
+        )
         output_path = str(Path.home() / filename)
     Path(output_path).write_text(html)
     return output_path

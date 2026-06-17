@@ -14,8 +14,6 @@ The model stays resident in memory after first load. On M4 36GB this uses
 Also usable by the session daemon for background indexing.
 """
 
-import os
-
 _model = None
 _tokenizer = None
 
@@ -29,6 +27,7 @@ def _ensure_loaded():
         return
 
     from mlx_lm import load
+
     _model, _tokenizer = load(MODEL_ID)
 
 
@@ -54,6 +53,7 @@ def is_available() -> bool:
     """Check if MLX is available (Apple Silicon + mlx-lm installed)."""
     try:
         import mlx_lm  # noqa: F401
+
         return True
     except ImportError:
         return False

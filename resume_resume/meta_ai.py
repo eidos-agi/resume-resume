@@ -30,6 +30,7 @@ from typing import Iterator
 # Paths
 # ---------------------------------------------------------------------------
 
+
 # Find the repo root (where .claude/ lives) by walking up from this file.
 def _repo_root() -> Path:
     p = Path(__file__).resolve()
@@ -73,6 +74,7 @@ def _now() -> str:
 # ---------------------------------------------------------------------------
 # Event-sourced JSONL helpers
 # ---------------------------------------------------------------------------
+
 
 def _append(path: Path, event: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,26 +130,27 @@ def load_thresholds() -> dict:
 
 def save_thresholds(data: dict) -> None:
     THRESHOLDS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    THRESHOLDS_FILE.write_text(
-        json.dumps(data, indent=2) + "\n", encoding="utf-8"
-    )
+    THRESHOLDS_FILE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-TUNABLE_KEYS = frozenset({
-    "slow_tool_p95_ms",
-    "error_prone_min_rate",
-    "error_prone_min_calls",
-    "dead_tool_divisor",
-    "dead_tool_min_volume",
-    "a1_min_confidence",
-    "a2_min_confidence",
-    "abandoned_queries_limit",
-})
+TUNABLE_KEYS = frozenset(
+    {
+        "slow_tool_p95_ms",
+        "error_prone_min_rate",
+        "error_prone_min_calls",
+        "dead_tool_divisor",
+        "dead_tool_min_volume",
+        "a1_min_confidence",
+        "a2_min_confidence",
+        "abandoned_queries_limit",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # A1 write side: called by the self_a1_file MCP tool (invoked by the A1 skill)
 # ---------------------------------------------------------------------------
+
 
 def file_a1_recommendation(
     *,
@@ -221,14 +224,17 @@ def file_a1_recommendation(
             save_thresholds(thresholds)
             rec["state"] = "auto_applied"
             rec["applied_at"] = _now()
-            _append(_applied_log(), {
-                "applied_at": rec["applied_at"],
-                "a1_rec_id": rec["id"],
-                "target": rec["target"],
-                "before": before,
-                "after": rec["new_value"],
-                "evidence": rec["evidence"],
-            })
+            _append(
+                _applied_log(),
+                {
+                    "applied_at": rec["applied_at"],
+                    "a1_rec_id": rec["id"],
+                    "target": rec["target"],
+                    "before": before,
+                    "after": rec["new_value"],
+                    "evidence": rec["evidence"],
+                },
+            )
         except Exception as e:
             rec["state"] = "auto_apply_failed"
             rec["error"] = str(e)
@@ -245,10 +251,16 @@ def file_a1_recommendation(
 # ---------------------------------------------------------------------------
 
 VALID_A2_TARGETS = frozenset({"a1_prompt", "thresholds.json", "cadence"})
-VALID_A2_CHANGE_TYPES = frozenset({
-    "prompt_edit", "threshold_change", "criterion_add", "criterion_remove",
-    "authority_change", "other",
-})
+VALID_A2_CHANGE_TYPES = frozenset(
+    {
+        "prompt_edit",
+        "threshold_change",
+        "criterion_add",
+        "criterion_remove",
+        "authority_change",
+        "other",
+    }
+)
 
 
 def file_a2_proposal(
@@ -267,7 +279,10 @@ def file_a2_proposal(
     if target not in VALID_A2_TARGETS:
         return {"skipped": "invalid_target", "valid": sorted(VALID_A2_TARGETS)}
     if change_type not in VALID_A2_CHANGE_TYPES:
-        return {"skipped": "invalid_change_type", "valid": sorted(VALID_A2_CHANGE_TYPES)}
+        return {
+            "skipped": "invalid_change_type",
+            "valid": sorted(VALID_A2_CHANGE_TYPES),
+        }
 
     thresholds = load_thresholds()
     min_conf = float(thresholds.get("a2_min_confidence", 0.7))
@@ -308,6 +323,7 @@ def file_a2_proposal(
 # Human inbox
 # ---------------------------------------------------------------------------
 
+
 def list_proposals(state: str = "pending", limit: int = 50) -> list[dict]:
     items = [p for p in _current(_a2_log()).values() if p.get("state") == state]
     items.sort(key=lambda p: p.get("created_at") or "", reverse=True)
@@ -316,7 +332,8 @@ def list_proposals(state: str = "pending", limit: int = 50) -> list[dict]:
 
 def proposal_history(limit: int = 100) -> list[dict]:
     items = [
-        p for p in _current(_a2_log()).values()
+        p
+        for p in _current(_a2_log()).values()
         if p.get("state") in {"approved", "rejected", "deferred"}
     ]
     items.sort(key=lambda p: p.get("decided_at") or "", reverse=True)
@@ -408,7 +425,10 @@ def _apply_proposal(proposal: dict) -> None:
 # Read helpers for MCP tools
 # ---------------------------------------------------------------------------
 
-def a1_recent_recommendations(limit: int = 20, action_class: str | None = None) -> list[dict]:
+
+def a1_recent_recommendations(
+    limit: int = 20, action_class: str | None = None
+) -> list[dict]:
     items: list[dict] = list(_iter(_a1_log()))
     if action_class:
         items = [x for x in items if x.get("action_class") == action_class]
@@ -433,6 +453,7 @@ def read_a1_prompt() -> str:
 # ---------------------------------------------------------------------------
 # Outcome tracking — TASK-0017
 # ---------------------------------------------------------------------------
+
 
 def a2_scorecard(days: int = 90) -> dict:
     """Score A2's effectiveness: for each approved proposal, what happened
@@ -467,7 +488,12 @@ def a2_scorecard(days: int = 90) -> dict:
 
         def _stats(recs: list[dict]) -> dict:
             if not recs:
-                return {"count": 0, "auto_applied": 0, "queued": 0, "avg_confidence": 0.0}
+                return {
+                    "count": 0,
+                    "auto_applied": 0,
+                    "queued": 0,
+                    "avg_confidence": 0.0,
+                }
             auto = sum(1 for r in recs if r.get("state") == "auto_applied")
             queued = sum(1 for r in recs if r.get("action_class") == "queued")
             confs = [r.get("confidence") or 0.0 for r in recs]
@@ -478,17 +504,19 @@ def a2_scorecard(days: int = 90) -> dict:
                 "avg_confidence": round(sum(confs) / len(confs), 3),
             }
 
-        rows.append({
-            "proposal_id": p.get("id"),
-            "title": p.get("title"),
-            "target": p.get("target"),
-            "decided_at": decided_at,
-            "expected_effect": p.get("expected_effect") or "",
-            "apply_error": p.get("apply_error"),
-            "a1_before": _stats(before),
-            "a1_after": _stats(after),
-            "has_after_data": len(after) > 0,
-        })
+        rows.append(
+            {
+                "proposal_id": p.get("id"),
+                "title": p.get("title"),
+                "target": p.get("target"),
+                "decided_at": decided_at,
+                "expected_effect": p.get("expected_effect") or "",
+                "apply_error": p.get("apply_error"),
+                "a1_before": _stats(before),
+                "a1_after": _stats(after),
+                "has_after_data": len(after) > 0,
+            }
+        )
 
     with_data = sum(1 for r in rows if r["has_after_data"])
 

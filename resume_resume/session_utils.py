@@ -51,8 +51,10 @@ def filter_automated(sessions: list[dict], cache_index: dict) -> list[dict]:
     copies of the same filter pattern.
     """
     return [
-        s for s in sessions
-        if cache_index.get(s.get("session_id", ""), {}).get("classification") != "automated"
+        s
+        for s in sessions
+        if cache_index.get(s.get("session_id", ""), {}).get("classification")
+        != "automated"
     ]
 
 

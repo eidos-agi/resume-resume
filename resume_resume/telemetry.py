@@ -120,12 +120,15 @@ def _maybe_rotate(root: Path) -> None:
 
     try:
         today = datetime.now(timezone.utc).date()
-        retention_days = int(os.environ.get("RESUME_RESUME_TELEMETRY_RETENTION_DAYS", "0"))
+        retention_days = int(
+            os.environ.get("RESUME_RESUME_TELEMETRY_RETENTION_DAYS", "0")
+        )
 
         for f in sorted(root.glob("*.jsonl")):
             try:
                 file_date_str = f.stem  # YYYY-MM-DD
                 from datetime import date as _date
+
                 file_date = _date.fromisoformat(file_date_str)
                 age_days = (today - file_date).days
             except (ValueError, TypeError):
@@ -151,6 +154,7 @@ def _maybe_rotate(root: Path) -> None:
                 try:
                     file_date_str = f.stem.replace(".jsonl", "")
                     from datetime import date as _date
+
                     file_date = _date.fromisoformat(file_date_str)
                     age_days = (today - file_date).days
                 except (ValueError, TypeError):
@@ -209,11 +213,21 @@ def _truncate_result(result: Any) -> Any:
 
 # Tools whose results are telemetry data — logging their full output
 # creates circular bloat. Log only size + preview for these.
-_SELF_TOOLS = frozenset({
-    "self_insights", "self_recent_calls", "self_slow_calls", "self_errors",
-    "self_search", "self_bundles", "self_a1_output", "self_a1_auto_applied",
-    "self_process_proposals", "self_proposal_history", "self_a2_scorecard",
-})
+_SELF_TOOLS = frozenset(
+    {
+        "self_insights",
+        "self_recent_calls",
+        "self_slow_calls",
+        "self_errors",
+        "self_search",
+        "self_bundles",
+        "self_a1_output",
+        "self_a1_auto_applied",
+        "self_process_proposals",
+        "self_proposal_history",
+        "self_a2_scorecard",
+    }
+)
 
 
 class TelemetryMiddleware(Middleware):

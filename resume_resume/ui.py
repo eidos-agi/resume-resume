@@ -29,7 +29,9 @@ class SessionPickerApp(App):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield SessionPickerPanel(
-            self.sessions, self.summaries, self._ops,
+            self.sessions,
+            self.summaries,
+            self._ops,
             title="claude-resume",
             id="picker",
         )

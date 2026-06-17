@@ -17,95 +17,171 @@ import json
 import subprocess
 
 # ── Tier thresholds for auto-promotion ────────────────────────────────────────
-TIER2_MSG_THRESHOLD  = 40    # promote if user sent ≥ this many messages
+TIER2_MSG_THRESHOLD = 40  # promote if user sent ≥ this many messages
 TIER2_SIZE_THRESHOLD = 500_000  # promote if JSONL ≥ 500KB
 
-QUICK_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "title": {"type": "string"},
-        "goal": {"type": "string"},
-        "what_was_done": {"type": "string"},
-        "state": {"type": "string"},
-        "files": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["title", "goal", "what_was_done", "state", "files"],
-})
-
-DEEP_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "title": {"type": "string"},
-        "objective": {"type": "string"},
-        "progress": {"type": "string"},
-        "state": {"type": "string"},
-        "next_steps": {"type": "string"},
-        "files": {"type": "array", "items": {"type": "string"}},
-        "decisions_made": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["title", "objective", "progress", "state", "next_steps", "files", "decisions_made"],
-})
-
-
-PATTERNS_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "prompt_patterns": {
-            "type": "object",
-            "properties": {
-                "effective": {"type": "array", "items": {"type": "object", "properties": {"example": {"type": "string"}, "why": {"type": "string"}}}},
-                "ineffective": {"type": "array", "items": {"type": "object", "properties": {"example": {"type": "string"}, "issue": {"type": "string"}}}},
-                "tips": {"type": "array", "items": {"type": "string"}},
-            },
+QUICK_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "goal": {"type": "string"},
+            "what_was_done": {"type": "string"},
+            "state": {"type": "string"},
+            "files": {"type": "array", "items": {"type": "string"}},
         },
-        "workflow_patterns": {
-            "type": "object",
-            "properties": {
-                "common_sequences": {"type": "array", "items": {"type": "object", "properties": {"tools": {"type": "array", "items": {"type": "string"}}, "context": {"type": "string"}, "efficiency": {"type": "string"}}}},
-                "iteration_style": {"type": "string"},
-            },
+        "required": ["title", "goal", "what_was_done", "state", "files"],
+    }
+)
+
+DEEP_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "objective": {"type": "string"},
+            "progress": {"type": "string"},
+            "state": {"type": "string"},
+            "next_steps": {"type": "string"},
+            "files": {"type": "array", "items": {"type": "string"}},
+            "decisions_made": {"type": "array", "items": {"type": "string"}},
         },
-        "anti_patterns": {"type": "array", "items": {"type": "object", "properties": {"pattern": {"type": "string"}, "cost": {"type": "string"}, "fix": {"type": "string"}}}},
-        "key_lesson": {"type": "string"},
-    },
-    "required": ["prompt_patterns", "workflow_patterns", "anti_patterns", "key_lesson"],
-})
+        "required": [
+            "title",
+            "objective",
+            "progress",
+            "state",
+            "next_steps",
+            "files",
+            "decisions_made",
+        ],
+    }
+)
 
 
-INSIGHT_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "title":           {"type": "string"},
-        "objective":       {"type": "string"},
-        "progress":        {"type": "string"},
-        "state":           {"type": "string"},
-        "next_steps":      {"type": "string"},
-        "files":           {"type": "array", "items": {"type": "string"}},
-        "decisions_made":  {"type": "array", "items": {"type": "string"}},
-        "architecture":    {"type": "string"},
-        "blockers":        {"type": "array", "items": {"type": "string"}},
-        "confidence":      {"type": "string", "enum": ["high", "medium", "low"]},
-        "session_quality": {"type": "string"},
-        "key_insight":     {"type": "string"},
-    },
-    "required": [
-        "title", "objective", "progress", "state", "next_steps",
-        "files", "decisions_made", "architecture", "blockers",
-        "confidence", "session_quality", "key_insight",
-    ],
-})
+PATTERNS_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "prompt_patterns": {
+                "type": "object",
+                "properties": {
+                    "effective": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "example": {"type": "string"},
+                                "why": {"type": "string"},
+                            },
+                        },
+                    },
+                    "ineffective": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "example": {"type": "string"},
+                                "issue": {"type": "string"},
+                            },
+                        },
+                    },
+                    "tips": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+            "workflow_patterns": {
+                "type": "object",
+                "properties": {
+                    "common_sequences": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "tools": {"type": "array", "items": {"type": "string"}},
+                                "context": {"type": "string"},
+                                "efficiency": {"type": "string"},
+                            },
+                        },
+                    },
+                    "iteration_style": {"type": "string"},
+                },
+            },
+            "anti_patterns": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "pattern": {"type": "string"},
+                        "cost": {"type": "string"},
+                        "fix": {"type": "string"},
+                    },
+                },
+            },
+            "key_lesson": {"type": "string"},
+        },
+        "required": [
+            "prompt_patterns",
+            "workflow_patterns",
+            "anti_patterns",
+            "key_lesson",
+        ],
+    }
+)
 
 
-def _call_claude(prompt: str, context: dict, timeout: int = 30,
-                 schema: str | None = None, model: str = "claude-haiku-4-5-20251001") -> dict:
+INSIGHT_SCHEMA = json.dumps(
+    {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "objective": {"type": "string"},
+            "progress": {"type": "string"},
+            "state": {"type": "string"},
+            "next_steps": {"type": "string"},
+            "files": {"type": "array", "items": {"type": "string"}},
+            "decisions_made": {"type": "array", "items": {"type": "string"}},
+            "architecture": {"type": "string"},
+            "blockers": {"type": "array", "items": {"type": "string"}},
+            "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+            "session_quality": {"type": "string"},
+            "key_insight": {"type": "string"},
+        },
+        "required": [
+            "title",
+            "objective",
+            "progress",
+            "state",
+            "next_steps",
+            "files",
+            "decisions_made",
+            "architecture",
+            "blockers",
+            "confidence",
+            "session_quality",
+            "key_insight",
+        ],
+    }
+)
+
+
+def _call_claude(
+    prompt: str,
+    context: dict,
+    timeout: int = 30,
+    schema: str | None = None,
+    model: str = "claude-haiku-4-5-20251001",
+) -> dict:
     """Call claude -p with only safe flags to avoid session file creation and hangs.
 
     --model and --output-format json cause silent hangs in subprocess context.
     Only --output-format text --max-turns 1 --no-session-persistence are safe.
     Model selection is embedded in the system prompt instead.
     """
-    env = {k: v for k, v in __import__("os").environ.items()
-           if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+    env = {
+        k: v
+        for k, v in __import__("os").environ.items()
+        if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")
+    }
 
     # Embed model preference in prompt preamble (can't use --model flag safely)
     model_hint = ""
@@ -115,12 +191,24 @@ def _call_claude(prompt: str, context: dict, timeout: int = 30,
     full_prompt = model_hint + prompt
 
     try:
-        cmd = ["claude", "-p", full_prompt,
-               "--no-session-persistence",
-               "--output-format", "text",
-               "--max-turns", "1"]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                                stdin=subprocess.DEVNULL, env=env)
+        cmd = [
+            "claude",
+            "-p",
+            full_prompt,
+            "--no-session-persistence",
+            "--output-format",
+            "text",
+            "--max-turns",
+            "1",
+        ]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+            env=env,
+        )
         output = result.stdout.strip()
         # Strip markdown code fences if present
         if output.startswith("```"):
@@ -130,8 +218,16 @@ def _call_claude(prompt: str, context: dict, timeout: int = 30,
             output = output.strip()
         return json.loads(output)
     except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
-        last = context.get("last_messages", [""])[-1] if context.get("last_messages") else ""
-        first = context.get("first_messages", [""])[0] if context.get("first_messages") else ""
+        last = (
+            context.get("last_messages", [""])[-1]
+            if context.get("last_messages")
+            else ""
+        )
+        first = (
+            context.get("first_messages", [""])[0]
+            if context.get("first_messages")
+            else ""
+        )
         return {
             "title": first[:60] if first else "Unknown session",
             "state": last[:120] if last else "No context available",
@@ -152,16 +248,16 @@ def summarize_quick(context: dict, project_dir: str, git: dict | None = None) ->
 The session was in: {project_dir}
 
 FIRST USER MESSAGES (original goal):
-{json.dumps(context['first_messages'], indent=2)}
+{json.dumps(context["first_messages"], indent=2)}
 
 LAST USER MESSAGES (where they left off):
-{json.dumps(context['last_messages'], indent=2)}
+{json.dumps(context["last_messages"], indent=2)}
 
 LAST ASSISTANT RESPONSES (what Claude was doing):
-{json.dumps(context['last_assistant'], indent=2)}
+{json.dumps(context["last_assistant"], indent=2)}
 
-RECENT TOOLS USED: {', '.join(context['recent_tools'][-10:])}
-TOTAL USER MESSAGES IN SESSION: {context['total_user_messages']}
+RECENT TOOLS USED: {", ".join(context["recent_tools"][-10:])}
+TOTAL USER MESSAGES IN SESSION: {context["total_user_messages"]}
 {git_section}
 Return ONLY a JSON object with these fields:
 - "title": A descriptive title for what this session was about (max 12 words)
@@ -177,7 +273,9 @@ Return raw JSON only. No markdown, no code fences, no explanation."""
     return _call_claude(prompt, context, schema=QUICK_SCHEMA)
 
 
-def summarize_deep(context: dict, project_dir: str, quick_summary: dict, git: dict | None = None) -> dict:
+def summarize_deep(
+    context: dict, project_dir: str, quick_summary: dict, git: dict | None = None
+) -> dict:
     """Deep second-pass summary with much more context."""
     git_section = ""
     if git and git.get("is_git_repo"):
@@ -192,21 +290,21 @@ The session was in: {project_dir}
 QUICK SUMMARY (from first pass): {json.dumps(quick_summary)}
 
 FIRST USER MESSAGES (original goal):
-{json.dumps(context['first_messages'], indent=2)}
+{json.dumps(context["first_messages"], indent=2)}
 
 FIRST ASSISTANT RESPONSES:
-{json.dumps(context['first_assistant'], indent=2)}
+{json.dumps(context["first_assistant"], indent=2)}
 
 LAST USER MESSAGES (most recent work):
-{json.dumps(context['last_messages'], indent=2)}
+{json.dumps(context["last_messages"], indent=2)}
 
 LAST ASSISTANT RESPONSES:
-{json.dumps(context['last_assistant'], indent=2)}
+{json.dumps(context["last_assistant"], indent=2)}
 
-ALL UNIQUE TOOLS USED: {', '.join(context['all_tools'][:30])}
-RECENT TOOL SEQUENCE: {', '.join(context['recent_tools'])}
-TOTAL USER MESSAGES: {context['total_user_messages']}
-TOTAL JSONL LINES: {context['total_lines']}
+ALL UNIQUE TOOLS USED: {", ".join(context["all_tools"][:30])}
+RECENT TOOL SEQUENCE: {", ".join(context["recent_tools"])}
+TOTAL USER MESSAGES: {context["total_user_messages"]}
+TOTAL JSONL LINES: {context["total_lines"]}
 {git_section}
 
 Return ONLY a JSON object with these fields:
@@ -223,8 +321,13 @@ Return raw JSON only. No markdown, no code fences, no explanation."""
     return _call_claude(prompt, context, timeout=90, schema=DEEP_SCHEMA)
 
 
-def summarize_insight(context: dict, project_dir: str, deep_summary: dict,
-                      git: dict | None = None, session_file_size: int = 0) -> dict:
+def summarize_insight(
+    context: dict,
+    project_dir: str,
+    deep_summary: dict,
+    git: dict | None = None,
+    session_file_size: int = 0,
+) -> dict:
     """Tier 3 insight summary using Sonnet — explicit only.
 
     Builds on the Tier 2 deep summary to produce a richer analysis:
@@ -247,13 +350,13 @@ The session was in: {project_dir}
 DEEP SUMMARY (Tier 2 analysis): {json.dumps(deep_summary, indent=2)}
 
 FULL MESSAGE SAMPLES:
-First messages: {json.dumps(context['first_messages'], indent=2)}
-Last messages: {json.dumps(context['last_messages'], indent=2)}
-First assistant: {json.dumps(context['first_assistant'], indent=2)}
-Last assistant: {json.dumps(context['last_assistant'], indent=2)}
+First messages: {json.dumps(context["first_messages"], indent=2)}
+Last messages: {json.dumps(context["last_messages"], indent=2)}
+First assistant: {json.dumps(context["first_assistant"], indent=2)}
+Last assistant: {json.dumps(context["last_assistant"], indent=2)}
 
-ALL TOOLS USED ({len(context['all_tools'])} unique): {', '.join(context['all_tools'][:40])}
-RECENT TOOL SEQUENCE: {', '.join(context['recent_tools'])}
+ALL TOOLS USED ({len(context["all_tools"])} unique): {", ".join(context["all_tools"][:40])}
+RECENT TOOL SEQUENCE: {", ".join(context["recent_tools"])}
 {git_section}
 
 Return ONLY a JSON object with:
@@ -273,8 +376,9 @@ Return ONLY a JSON object with:
 Be surgical and specific. This is for a developer who needs to pick up a thread with zero warm-up.
 Return raw JSON only. No markdown, no code fences."""
 
-    return _call_claude(prompt, context, timeout=120, schema=INSIGHT_SCHEMA,
-                        model="claude-sonnet-4-6")
+    return _call_claude(
+        prompt, context, timeout=120, schema=INSIGHT_SCHEMA, model="claude-sonnet-4-6"
+    )
 
 
 def auto_tier(context: dict, session_file_size: int, git: dict | None = None) -> int:
@@ -288,7 +392,11 @@ def auto_tier(context: dict, session_file_size: int, git: dict | None = None) ->
     msgs = context.get("total_user_messages", 0)
     has_dirty = bool(git and git.get("uncommitted_changes"))
 
-    if msgs >= TIER2_MSG_THRESHOLD or session_file_size >= TIER2_SIZE_THRESHOLD or has_dirty:
+    if (
+        msgs >= TIER2_MSG_THRESHOLD
+        or session_file_size >= TIER2_SIZE_THRESHOLD
+        or has_dirty
+    ):
         return 2
     return 1
 
@@ -300,14 +408,14 @@ Session: {project_dir}
 Summary: {json.dumps(summary)}
 
 USER MESSAGES (samples):
-{json.dumps(context['first_messages'] + context['last_messages'], indent=2)}
+{json.dumps(context["first_messages"] + context["last_messages"], indent=2)}
 
 ASSISTANT RESPONSES (samples):
-{json.dumps(context['first_assistant'] + context['last_assistant'], indent=2)}
+{json.dumps(context["first_assistant"] + context["last_assistant"], indent=2)}
 
-TOOL SEQUENCE: {', '.join(context['recent_tools'])}
-ALL TOOLS: {', '.join(context['all_tools'][:20])}
-TOTAL MESSAGES: {context['total_user_messages']}
+TOOL SEQUENCE: {", ".join(context["recent_tools"])}
+ALL TOOLS: {", ".join(context["all_tools"][:20])}
+TOTAL MESSAGES: {context["total_user_messages"]}
 
 Return JSON with:
 - "prompt_patterns": {{"effective": [{{"example": "quoted instruction", "why": "reason"}}], "ineffective": [{{"example": "quoted instruction", "issue": "problem"}}], "tips": ["actionable advice"]}}

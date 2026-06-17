@@ -28,6 +28,7 @@ def test_fresh_unindexed_session_is_findable(tmp_path, monkeypatch):
     )
     session_file.touch()
     import os as _os
+
     _os.utime(session_file, (mtime, mtime))
 
     fresh_session = {
@@ -56,10 +57,20 @@ def test_fresh_unindexed_session_is_findable(tmp_path, monkeypatch):
 
 def test_fresh_sessions_respects_window_and_cap(tmp_path, monkeypatch):
     # Older than the freshness window -> excluded; fresh -> included.
-    old = {"session_id": "too-old", "file": tmp_path / "a", "project_dir": "",
-           "mtime": time.time() - ms._FRESH_WINDOW_SECONDS - 60, "size": 200}
-    new = {"session_id": "fresh", "file": tmp_path / "b", "project_dir": "",
-           "mtime": time.time() - 60, "size": 200}
+    old = {
+        "session_id": "too-old",
+        "file": tmp_path / "a",
+        "project_dir": "",
+        "mtime": time.time() - ms._FRESH_WINDOW_SECONDS - 60,
+        "size": 200,
+    }
+    new = {
+        "session_id": "fresh",
+        "file": tmp_path / "b",
+        "project_dir": "",
+        "mtime": time.time() - 60,
+        "size": 200,
+    }
     monkeypatch.setattr(ms, "_find_all_sessions_cached", lambda: [old, new])
 
     out = ms._fresh_sessions()

@@ -2,10 +2,10 @@
 
 Proves each speedup with actual timing using time.perf_counter().
 """
+
 import json
 import time
 import re
-import math
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -49,8 +49,8 @@ def _extract_snippet(raw: bytes, term: bytes, context_chars: int = 80) -> str:
     except Exception:
         return ""
     text = text.replace("\\n", " ").replace("\\t", " ").replace('\\"', '"')
-    text = re.sub(r'["\{\}\[\]\\]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r'["\{\}\[\]\\]', "", text)
+    text = re.sub(r"\s+", " ", text).strip()
     if start > 0:
         text = "..." + text
     if end < len(raw):
@@ -60,6 +60,7 @@ def _extract_snippet(raw: bytes, term: bytes, context_chars: int = 80) -> str:
 
 def search_raw(sessions, terms_bytes):
     """Baseline: always read raw JSONL, no cache."""
+
     def _check(s):
         raw = _read_session_bytes(s)
         if raw is None:
@@ -83,6 +84,7 @@ def search_raw(sessions, terms_bytes):
 
 def search_cached(sessions, terms_bytes, cache_index, include_automated=False):
     """Optimized: cache fast path, raw fallback."""
+
     def _check(s):
         sid = s["session_id"]
         cached = cache_index.get(sid)
@@ -132,19 +134,27 @@ def search_cached(sessions, terms_bytes, cache_index, include_automated=False):
 
 def _make_fake_jsonl(path: Path, target_size_bytes: int, keyword: str) -> None:
     """Write a realistic-looking JSONL file of roughly target_size_bytes."""
-    line = json.dumps({
-        "type": "message",
-        "role": "assistant",
-        "content": f"This is a session message. {keyword} appears here. " + "x" * 200,
-        "timestamp": "2024-01-15T10:00:00Z",
-        "uuid": "aaaa-bbbb-cccc-dddd",
-    }) + "\n"
+    line = (
+        json.dumps(
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": f"This is a session message. {keyword} appears here. "
+                + "x" * 200,
+                "timestamp": "2024-01-15T10:00:00Z",
+                "uuid": "aaaa-bbbb-cccc-dddd",
+            }
+        )
+        + "\n"
+    )
     line_bytes = line.encode()
     repeats = max(1, target_size_bytes // len(line_bytes))
     path.write_bytes(line_bytes * repeats)
 
 
-def _make_fake_cache(path: Path, session_id: str, keyword: str, classification: str) -> None:
+def _make_fake_cache(
+    path: Path, session_id: str, keyword: str, classification: str
+) -> None:
     """Write a ~2KB cache JSON file with search_text."""
     search_text = (
         f"session about {keyword} implementation. "
@@ -189,13 +199,15 @@ def test_cache_fast_path_vs_raw(tmp_path):
         jsonl_file = sessions_dir / f"{sid}.jsonl"
         _make_fake_jsonl(jsonl_file, 1_000_000, keyword)  # 1MB each
         stat = jsonl_file.stat()
-        sessions.append({
-            "file": jsonl_file,
-            "session_id": sid,
-            "project_dir": str(tmp_path),
-            "mtime": stat.st_mtime,
-            "size": stat.st_size,
-        })
+        sessions.append(
+            {
+                "file": jsonl_file,
+                "session_id": sid,
+                "project_dir": str(tmp_path),
+                "mtime": stat.st_mtime,
+                "size": stat.st_size,
+            }
+        )
 
         cache_file = cache_dir / f"{sid}.json"
         _make_fake_cache(cache_file, sid, keyword, "interactive")
@@ -216,11 +228,13 @@ def test_cache_fast_path_vs_raw(tmp_path):
 
     # Time cached path
     t0 = time.perf_counter()
-    cached_results = search_cached(sessions, terms_bytes, cache_index, include_automated=True)
+    cached_results = search_cached(
+        sessions, terms_bytes, cache_index, include_automated=True
+    )
     cached_elapsed = time.perf_counter() - t0
 
     speedup = raw_elapsed / max(cached_elapsed, 1e-9)
-    print(f"\n[test_cache_fast_path_vs_raw]")
+    print("\n[test_cache_fast_path_vs_raw]")
     print(f"  Raw path:    {raw_elapsed:.3f}s  ({len(raw_results)} hits)")
     print(f"  Cached path: {cached_elapsed:.3f}s  ({len(cached_results)} hits)")
     print(f"  Speedup:     {speedup:.1f}x")
@@ -228,7 +242,9 @@ def test_cache_fast_path_vs_raw(tmp_path):
     # Results must be identical (same session IDs)
     raw_ids = {r[0] for r in raw_results}
     cached_ids = {r[0] for r in cached_results}
-    assert raw_ids == cached_ids, f"Result mismatch: raw={len(raw_ids)} cached={len(cached_ids)}"
+    assert raw_ids == cached_ids, (
+        f"Result mismatch: raw={len(raw_ids)} cached={len(cached_ids)}"
+    )
 
     assert speedup > 5, f"Expected >5x speedup, got {speedup:.1f}x"
 
@@ -278,26 +294,40 @@ def test_ml_prefilter_reduces_corpus(tmp_path):
         cache_index[cache_file.stem] = json.loads(cache_file.read_bytes())
 
     # Default: exclude automated
-    results_no_auto = search_cached(sessions, terms_bytes, cache_index, include_automated=False)
+    results_no_auto = search_cached(
+        sessions, terms_bytes, cache_index, include_automated=False
+    )
     # Include automated
-    results_with_auto = search_cached(sessions, terms_bytes, cache_index, include_automated=True)
+    results_with_auto = search_cached(
+        sessions, terms_bytes, cache_index, include_automated=True
+    )
 
     auto_ids = {s["session_id"] for s in sessions if "automated" in s["session_id"]}
-    interactive_ids = {s["session_id"] for s in sessions if "interactive" in s["session_id"] or "inte" in s["session_id"]}
+    interactive_ids = {
+        s["session_id"]
+        for s in sessions
+        if "interactive" in s["session_id"] or "inte" in s["session_id"]
+    }
 
     found_without = {r[0] for r in results_no_auto}
     found_with = {r[0] for r in results_with_auto}
 
     # All automated sessions excluded when include_automated=False
-    assert not (found_without & auto_ids), "Automated sessions leaked into default search"
+    assert not (found_without & auto_ids), (
+        "Automated sessions leaked into default search"
+    )
     # All interactive sessions found in both modes
-    assert interactive_ids.issubset(found_without), "Interactive sessions missing from default search"
-    assert interactive_ids.issubset(found_with), "Interactive sessions missing from include_automated search"
+    assert interactive_ids.issubset(found_without), (
+        "Interactive sessions missing from default search"
+    )
+    assert interactive_ids.issubset(found_with), (
+        "Interactive sessions missing from include_automated search"
+    )
     # All sessions found when include_automated=True
     assert len(found_with) == n_automated + n_interactive
 
     reduction_pct = (1 - len(results_no_auto) / len(results_with_auto)) * 100
-    print(f"\n[test_ml_prefilter_reduces_corpus]")
+    print("\n[test_ml_prefilter_reduces_corpus]")
     print(f"  Total sessions: {n_automated + n_interactive}")
     print(f"  With include_automated=False: {len(results_no_auto)} searched")
     print(f"  With include_automated=True:  {len(results_with_auto)} searched")
@@ -341,11 +371,13 @@ def test_snippet_quality_cached_vs_raw(tmp_path):
     raw_snippet = _extract_snippet(raw_bytes, terms_bytes[0])
 
     # Get cached snippet
-    cached_results = search_cached([s], terms_bytes, cache_index, include_automated=True)
+    cached_results = search_cached(
+        [s], terms_bytes, cache_index, include_automated=True
+    )
     assert cached_results, "Expected at least one cached result"
     cached_snippet = cached_results[0][3]
 
-    print(f"\n[test_snippet_quality_cached_vs_raw]")
+    print("\n[test_snippet_quality_cached_vs_raw]")
     print(f"  Raw snippet:    {repr(raw_snippet[:120])}")
     print(f"  Cached snippet: {repr(cached_snippet[:120])}")
 
@@ -354,10 +386,14 @@ def test_snippet_quality_cached_vs_raw(tmp_path):
     #  because the source text itself is JSON-encoded)
     json_escapes = ["\\n", "\\t", '\\"', "\\\\"]
     cached_has_escapes = any(e in cached_snippet for e in json_escapes)
-    assert not cached_has_escapes, f"Cached snippet contains JSON escapes: {repr(cached_snippet)}"
+    assert not cached_has_escapes, (
+        f"Cached snippet contains JSON escapes: {repr(cached_snippet)}"
+    )
 
     # Cached snippet should contain the keyword
-    assert keyword in cached_snippet.lower(), f"Keyword not in cached snippet: {repr(cached_snippet)}"
+    assert keyword in cached_snippet.lower(), (
+        f"Keyword not in cached snippet: {repr(cached_snippet)}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +409,9 @@ def test_real_data_benchmark():
 
     cache_files = list(cache_dir.glob("*.json"))
     if len(cache_files) < 10:
-        pytest.skip(f"Too few cache files ({len(cache_files)}) for meaningful benchmark")
+        pytest.skip(
+            f"Too few cache files ({len(cache_files)}) for meaningful benchmark"
+        )
 
     # Common search term likely to appear in many sessions
     search_term = "python"
@@ -395,13 +433,16 @@ def test_real_data_benchmark():
     sessions = []
     for sid, data in cache_index.items():
         size_kb = data.get("stats", {}).get("size_kb", 500)
-        sessions.append({
-            "file": cache_dir / f"{sid}.jsonl",  # may not exist — that's fine for cache path
-            "session_id": sid,
-            "project_dir": "~",
-            "mtime": time.time() - 86400,
-            "size": size_kb * 1024,
-        })
+        sessions.append(
+            {
+                "file": cache_dir
+                / f"{sid}.jsonl",  # may not exist — that's fine for cache path
+                "session_id": sid,
+                "project_dir": "~",
+                "mtime": time.time() - 86400,
+                "size": size_kb * 1024,
+            }
+        )
 
     # Time cached search
     t0 = time.perf_counter()
@@ -409,7 +450,9 @@ def test_real_data_benchmark():
     cached_elapsed = time.perf_counter() - t0
 
     # Count how many had cache hits vs would need raw fallback
-    cache_hits = sum(1 for s in sessions if cache_index.get(s["session_id"], {}).get("search_text"))
+    cache_hits = sum(
+        1 for s in sessions if cache_index.get(s["session_id"], {}).get("search_text")
+    )
     raw_needed = len(sessions) - cache_hits
 
     # Estimate baseline: assume 2MB avg per session, 500MB/s disk bandwidth
@@ -418,14 +461,18 @@ def test_real_data_benchmark():
     estimated_raw_time = (len(sessions) * avg_session_bytes) / disk_bandwidth
     estimated_speedup = estimated_raw_time / max(cached_elapsed, 1e-9)
 
-    print(f"\n[test_real_data_benchmark]")
+    print("\n[test_real_data_benchmark]")
     print(f"  Cache files loaded: {len(cache_index)} in {t_load:.3f}s")
     print(f"  Sessions scanned:   {len(sessions)}")
-    print(f"  Cache hits:         {cache_hits} ({100*cache_hits//max(len(sessions),1)}%)")
+    print(
+        f"  Cache hits:         {cache_hits} ({100 * cache_hits // max(len(sessions), 1)}%)"
+    )
     print(f"  Raw reads needed:   {raw_needed}")
     print(f"  Search wall time:   {cached_elapsed:.3f}s")
     print(f"  Results found:      {len(results)}")
-    print(f"  Est. speedup vs baseline (2MB/session, 500MB/s disk): {estimated_speedup:.0f}x")
+    print(
+        f"  Est. speedup vs baseline (2MB/session, 500MB/s disk): {estimated_speedup:.0f}x"
+    )
 
     # Basic sanity: should complete in reasonable time
     assert cached_elapsed < 30, f"Search took too long: {cached_elapsed:.1f}s"

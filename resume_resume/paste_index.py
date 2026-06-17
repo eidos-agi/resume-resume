@@ -33,14 +33,19 @@ def normalize_ws(s: str) -> str:
     paste matches the session through markdown, em-dashes, smart/escaped quotes,
     and terminal wrapping. Idempotent. Strip JSON-escaped newlines first so
     `\\n` doesn't leave a stray 'n'."""
-    s = s.replace("\\r\\n", " ").replace("\\n", " ").replace("\\t", " ").replace("\\r", " ")
+    s = (
+        s.replace("\\r\\n", " ")
+        .replace("\\n", " ")
+        .replace("\\t", " ")
+        .replace("\\r", " ")
+    )
     return _SP.sub(" ", _WS.sub(" ", s.lower())).strip()
 
 
 def _shingles(words: list[str], n: int = 5) -> list[str]:
     if len(words) < n:
         return [" ".join(words)] if words else []
-    return [" ".join(words[i:i + n]) for i in range(0, len(words) - n + 1, n)]
+    return [" ".join(words[i : i + n]) for i in range(0, len(words) - n + 1, n)]
 
 
 def coverage(shingles: list[str], norm_text: str) -> float:
@@ -136,7 +141,7 @@ def search(con: sqlite3.Connection, paste: str, limit: int = 6, self_sid: str = 
     # Candidate retrieval: a consecutive phrase from the middle of the paste
     # (precise), falling back to OR of the longest distinctive words.
     mid = max(0, len(words) // 2 - 4)
-    cands = run('"' + " ".join(words[mid:mid + 8]) + '"')
+    cands = run('"' + " ".join(words[mid : mid + 8]) + '"')
     if not cands:
         terms = sorted({w for w in words if len(w) >= 4}, key=len, reverse=True)[:8]
         cands = run(" OR ".join(f'"{t}"' for t in terms)) if terms else []

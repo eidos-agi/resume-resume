@@ -5,6 +5,7 @@ tokens with AND, so a session matching 3 of 4 words returned zero results.
 Tokens are now joined with OR (tolerant), and bm25() ranking floats the
 sessions matching more terms to the top.
 """
+
 from resume_resume.search_index import _fts_query
 
 

@@ -290,7 +290,9 @@ def search(
         where = ["sessions_fts MATCH ?"]
         params: list[Any] = [fts]
         if not include_automated:
-            where.append("(s.classification IS NULL OR s.classification != 'automated')")
+            where.append(
+                "(s.classification IS NULL OR s.classification != 'automated')"
+            )
         if cutoff_after:
             where.append("s.mtime >= ?")
             params.append(cutoff_after)
@@ -307,7 +309,7 @@ def search(
                        s.state, s.classification, bm25(sessions_fts) AS rank
                 FROM sessions_fts
                 JOIN sessions s ON s.session_id = sessions_fts.session_id
-                WHERE {' AND '.join(where)}
+                WHERE {" AND ".join(where)}
                 ORDER BY rank ASC, s.mtime DESC
                 LIMIT ?""",
             params,
@@ -335,7 +337,9 @@ def count_matches(
         where = ["sessions_fts MATCH ?"]
         params: list[Any] = [fts]
         if not include_automated:
-            where.append("(s.classification IS NULL OR s.classification != 'automated')")
+            where.append(
+                "(s.classification IS NULL OR s.classification != 'automated')"
+            )
         if cutoff_after:
             where.append("s.mtime >= ?")
             params.append(cutoff_after)
@@ -353,7 +357,7 @@ def count_matches(
             f"""SELECT count(*) AS c
                 FROM sessions_fts
                 JOIN sessions s ON s.session_id = sessions_fts.session_id
-                WHERE {' AND '.join(where)}""",
+                WHERE {" AND ".join(where)}""",
             params,
         ).fetchone()
         return int(row["c"] or 0)
@@ -381,7 +385,7 @@ def recent_candidates(
             f"""SELECT session_id, summary_path, mtime, project_dir, classification,
                        score, title, state, summary_json
                 FROM sessions
-                WHERE {' AND '.join(where)}
+                WHERE {" AND ".join(where)}
                 ORDER BY mtime DESC
                 LIMIT ?""",
             params,

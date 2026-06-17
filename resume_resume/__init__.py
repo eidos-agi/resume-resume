@@ -16,7 +16,13 @@ from .sessions import (
     relative_time,
     shorten_path,
 )
-from .summarize import analyze_patterns, auto_tier, summarize_deep, summarize_insight, summarize_quick
+from .summarize import (
+    analyze_patterns,
+    auto_tier,
+    summarize_deep,
+    summarize_insight,
+    summarize_quick,
+)
 from .ui import SessionPickerApp
 
 __all__ = [
