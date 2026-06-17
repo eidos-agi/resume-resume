@@ -123,7 +123,20 @@ It parses the id out of whatever you pasted, searches `~/.claude/projects/*/` fo
 
 ### How paste-to-find works
 
-When you paste chat text (no id), `cr` resolves it through a **persistent full-text index** — every session's normalized text indexed once into SQLite FTS5 (the summary index only holds titles, so pasted *transcript* text isn't findable there). A query is an FTS candidate lookup followed by *in-order n-gram coverage* scoring on just those candidates: the fraction of your paste's word-chunks that appear verbatim, after normalizing away markdown, em-dashes, smart/escaped quotes, and terminal wrapping. The best match above a calibrated threshold (0.25) is opened; below it, you get the list. The index refreshes incrementally (only changed sessions re-index), and the session you're currently in (`CLAUDE_CODE_SESSION_ID`) is skipped — you don't resume the chat you're sitting in.
+Finding the right chat from a messy paste isn't one trick — it's a small retrieval **pipeline**. The index makes it *fast*; the normalize + score + gate stages make it *correct*. FTS alone would only get candidates quickly.
+
+| stage | technique | what it buys |
+|---|---|---|
+| **Capture** | bracketed-paste detection (`ESC[200~`), ANSI/control stripping, stdin burst-drain | survives a real terminal paste — multi-line, wrapped, with escape codes |
+| **Route** | regex extraction of a UUID / `rollout-` id vs free text | a pasted command or id opens directly; chat text goes to search |
+| **Normalize** | lowercase + reduce every non-alphanumeric run to one space (both paste and index) | tolerance — matches through `**markdown**`, em-dashes (—), smart/escaped quotes, and terminal line-wrapping |
+| **Retrieve** | SQLite **FTS5**: a consecutive phrase from the paste, falling back to OR of the longest distinctive words | the fast candidate set — ms, not a full-corpus scan (the *speed*) |
+| **Score** | **in-order n-gram coverage**: fraction of the paste's 5-word chunks present verbatim in a candidate | ranking + verification (the *precision* — and the 0% wrong-chat property) |
+| **Gate** | threshold **0.25**, calibrated from a 180-trial precision/recall sweep | open only on confidence; otherwise fall through to the list, never misfire |
+| **Exclude** | drop the launching session via `CLAUDE_CODE_SESSION_ID` | never reopen the chat you're sitting in |
+| **Maintain** | mtime-delta **incremental refresh** + external-content FTS5 + sync triggers | first run builds; after that only changed sessions re-index, so queries stay ms |
+
+The summary/BM25 index (`search_sessions`) holds only titles + summaries, so pasted *transcript* text isn't findable there — this is a separate full-text index over normalized session bodies.
 
 **Measured results** (180-trial calibration + adversarial batch, driven through [emux](https://github.com/eidos-agi/emux)/tmux):
 
