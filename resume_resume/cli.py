@@ -670,43 +670,32 @@ def _paste_box_or_fallthrough():
 
 
 def _scan_candidates(paste: str, limit: int = 6):
-    """Full-text raw scan of every session file for `paste`. Returns the best
-    [(session_id, path, coverage)] by in-order coverage.
+    """Find the sessions whose text best matches `paste`, via the persistent
+    full-text index. Returns the best [(session_id, path, coverage)].
 
-    The FTS/summary index only holds titles + summaries, so pasted transcript
-    text from an old session isn't retrievable through it — only a raw scan
-    finds it. A cheap pre-filter (longest paste word must appear as a raw
-    substring) skips files that can't match, so we only pay full normalization
-    on plausible hits. Skips the launching session (CLAUDE_CODE_SESSION_ID).
-    ponytail: O(all-session-bytes) per paste; ~hundreds of MB scans in a few
-    seconds. If the corpus grows huge, gate behind a fast index pre-pass."""
-    import glob
-    from concurrent.futures import ThreadPoolExecutor
+    Each session's normalized text is indexed once into SQLite FTS5; a query is
+    an FTS candidate lookup + coverage scoring on just those candidates —
+    milliseconds, vs a multi-second raw scan of the whole corpus. refresh() is
+    incremental (only changed sessions re-normalize), so the only slow run is
+    the first build. Skips the launching session (CLAUDE_CODE_SESSION_ID)."""
+    from . import paste_index
 
-    words = _normalize_ws(paste).split()
-    anchor = max(words, key=len) if words else ""
-    if not anchor:
-        return []
-    self_sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
-    files = glob.glob(os.path.expanduser("~/.claude/projects/**/*.jsonl"), recursive=True)
+    con = paste_index._connect()
+    try:
+        built = con.execute("SELECT count(*) FROM docs").fetchone()[0]
 
-    def score(f: str):
-        sid = os.path.basename(f)[:-6]  # strip .jsonl
-        if sid == self_sid:
-            return None
-        try:
-            raw = open(f, encoding="utf-8", errors="replace").read()
-        except OSError:
-            return None
-        if anchor not in raw.lower():  # cheap skip before full normalization
-            return None
-        cov = _paste_coverage(paste, raw)
-        return (sid, f, cov) if cov > 0 else None
+        def _progress(done, total):
+            if done == 1 or done == total or done % 50 == 0:
+                print(f"\r  \033[90mindexing sessions… {done}/{total}\033[0m",
+                      end="", file=sys.stderr, flush=True)
 
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        out = [r for r in pool.map(score, files) if r]
-    out.sort(key=lambda r: r[2], reverse=True)
-    return out[:limit]
+        n = paste_index.refresh(con, progress=_progress if not built else None)
+        if not built and n:
+            print(file=sys.stderr)  # newline after the progress line
+        self_sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+        return paste_index.search(con, paste, limit=limit, self_sid=self_sid)
+    finally:
+        con.close()
 
 
 PASTE_LOG = Path.home() / ".claude-resume-duet" / "cr-paste.log"
@@ -768,32 +757,19 @@ def _read_paste() -> str:
 
 
 def _normalize_ws(s: str) -> str:
-    """Lowercase and reduce ALL non-alphanumeric runs to single spaces, so a
-    paste matches the session through markdown (**bold**), smart quotes,
-    em-dashes (—), escaped \\" and \\n, and terminal wrapping. Only letters,
-    digits, and word order survive — maximal tolerance of incorrect characters.
-    Strip JSON-escaped newlines first so '\\n' doesn't leave a stray 'n'."""
-    s = s.replace("\\r\\n", " ").replace("\\n", " ").replace("\\t", " ").replace("\\r", " ")
-    s = re.sub(r"[^a-z0-9]+", " ", s.lower())
-    return re.sub(r"\s+", " ", s).strip()
+    """Shared normalizer — see paste_index.normalize_ws. Kept here as a stable
+    name for callers/tests."""
+    from .paste_index import normalize_ws
+    return normalize_ws(s)
 
 
 def _paste_coverage(paste: str, session_text: str, n: int = 5) -> float:
-    """Fraction of the paste's contiguous word-chunks that appear verbatim in
-    `session_text`. Each chunk is `n` words IN ORDER, so this still rewards real
-    pasted text and rejects coincidental keyword overlap — but unlike one
-    difflib window it tolerates a paste whose lines are SCATTERED across the
-    session (a recap pulling from many points). Whitespace-normalized both
-    sides. ponytail: verbatim n-gram containment; a few bad chars only cost the
-    chunks they fall in, not the whole score."""
-    a = _normalize_ws(paste).split()
-    b = _normalize_ws(session_text)
-    if not a or not b:
-        return 0.0
-    if len(a) < n:
-        return 1.0 if " ".join(a) in b else 0.0
-    chunks = [" ".join(a[i: i + n]) for i in range(0, len(a) - n + 1, n)]
-    return sum(1 for c in chunks if c in b) / len(chunks)
+    """Fraction of the paste's contiguous n-word chunks that appear verbatim in
+    `session_text` (in-order coverage). Rewards real pasted text, rejects
+    coincidental keyword overlap, tolerant of text scattered across the session.
+    Delegates to the shared scorer so the index and this share one definition."""
+    from .paste_index import _shingles, coverage, normalize_ws
+    return coverage(_shingles(normalize_ws(paste).split(), n), normalize_ws(session_text))
 
 
 def main():
