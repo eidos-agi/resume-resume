@@ -13,9 +13,19 @@
 | **Dirty Repos** | See every repo with uncommitted changes across your entire machine — your standing to-do list. Scored by file count and recency. |
 | **Crash Recovery** | `boot_up` finds interrupted sessions AND scans all repos for dirty git state. Ready-to-paste resume commands. |
 | **Prioritize** | Auto-ranks sessions and repos by urgency — dirty files don't age out, recent active work surfaces first. |
-| **Speed** | Parallelized BM25 search across gigabytes of past chats in seconds. Parallel git status scans across 50+ repos. |
+| **Speed** | Paste a chat back to life in **~6 ms** — indexed full-text search across your entire history (see below). Plus parallel git scans across 50+ repos. |
 | **Cost Savings** | Uses Haiku to summarize past context once, then caches permanently — searching thousands of sessions costs nothing after first run. |
 | **Merge** | Merge multiple old chats together, pulling context across sessions into a single conversation — **including across tools**: bridge Codex research into a Claude Code session and vice versa. |
+
+---
+
+## Paste a dead chat back to life — in milliseconds
+
+Your session crashed; the terminal still shows the tail of it. Copy any chunk of that text, run `cr`, paste. It finds the exact chat that text came from and reopens it — no session id, no scrolling a list. Indexed full-text search across your whole history, and unlike `grep`/`rg` it **ranks and verifies** the match — so it opens the *right* chat (0% wrong in testing), not the first hit.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/eidos-agi/resume-resume/master/assets/perf.png" alt="query latency — 6 ms indexed vs 5.5 s brute-force scan" width="760"/>
+</p>
 
 ---
 
@@ -148,24 +158,7 @@ The summary/BM25 index (`search_sessions`) holds only titles + summaries, so pas
 | Decoys (shuffled vocab, unrelated text) | **0 false positives** — scores max out at 0.00 |
 | When unsure | Falls through to the list — safe by design, never a misfire |
 
-**Speed** — measured, indexed query latency (FTS lookup + coverage scoring):
-
-| corpus | build (one-time) | query p50 | p95 |
-|---|---|---|---|
-| 328 chats · ~40M tokens · 166 MB | ~10 s | **6 ms** | 8 ms |
-| 5,574 chats · 3.0 GB (synthetic) | ~4 min | **94 ms** | 319 ms |
-
-Build is **incremental** after the first run — only sessions whose file changed get re-indexed, so day-to-day queries are pure milliseconds. (The 3 GB corpus is *duplicated* sessions — a worst case for candidate scoring; a same-size corpus of distinct sessions resolves fewer candidates and runs faster.)
-
-**Why an index** — the naive way to answer "which session is this paste from?" is brute force: read + normalize *every* session file on *every* query. It needs nothing persistent, but pays the whole corpus cost each time. Head-to-head on the same 176 MB / 328 chats:
-
-| approach | requires | query p50 |
-|---|---|---|
-| brute force (no index) | nothing — re-scans 176 MB every query, O(corpus), linear | ~19 s |
-| anchor pre-filter heuristic | nothing — skips files that can't match | ~5.5 s |
-| **FTS5 index** | one-time build + corpus-sized file on disk, incremental | **~2–6 ms** |
-
-The index spends build time + disk **once** to make every query cheap forever; brute force re-pays the full corpus cost per lookup, and the gap widens with corpus size (brute force at 3 GB is minutes/query; the index stays sub-100 ms).
+**Speed** — indexed query (FTS lookup + coverage scoring): **p50 6 ms** at 166 MB, **94 ms** at 3 GB. The first run builds the index (~10 s); after that, incremental refresh re-indexes only changed sessions, so queries stay in the millisecond range. A brute-force scan without an index is ~5.5 s/query and grows linearly with corpus size — the chart at the top is that gap.
 
 ---
 
