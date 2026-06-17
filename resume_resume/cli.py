@@ -26,6 +26,10 @@ from claude_session_commons.summarize import analyze_patterns, summarize_deep, s
 from .ui import SessionPickerApp
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+# Unanchored: pull a session id out of a pasted command (e.g. "cd x && claude --resume <id>").
+ID_IN_TEXT = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|rollout-[\w-]+", re.I
+)
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
 DEFAULT_HOURS = 4
@@ -607,7 +611,132 @@ def _resume_from_paste(argv: list[str]):
 
     if project_path and os.path.isdir(project_path):
         os.chdir(project_path)
+    sys.stdout.flush()  # execvp replaces us; flush the proof lines first
     os.execvp(binary, cmd)
+
+
+def _paste_box_or_fallthrough():
+    """Bare `cr`: show a paste box before the picker.
+
+    Paste a resume command (or bare session id) -> resolve cwd & launch it.
+    Blank line / Ctrl-D / Ctrl-C -> return so the normal session picker shows.
+    """
+    try:
+        print("\n  \033[1m📋 Paste a resume command, session id, or chat text"
+              " — or press Enter for the list:\033[0m")
+        line = _read_paste()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if not line:
+        return
+
+    # 1) Pasted a resume command or bare id -> open it directly.
+    m = ID_IN_TEXT.search(line)
+    if m:
+        sid = m.group(0)
+        is_codex = sid.lower().startswith("rollout-") or "codex" in line.split()
+        # ponytail: extract just the id; shell wrappers (cd … &&) and trailing
+        # flags in the paste are dropped. For flags use the argv form:
+        # `cr claude --resume <id> --model opus`.
+        _resume_from_paste((["codex"] if is_codex else []) + [sid])  # execs
+        return
+
+    # 2) Pasted chat text -> resume-resume's whole point: find the session that
+    #    matches the most of this text, then open it. Same hit-count ranking the
+    #    MCP search uses (total term occurrences, most-matched wins).
+    from .mcp_server import search_sessions
+    search = getattr(search_sessions, "fn", search_sessions)
+    items = search(line, limit=1, include_automated=True).get("items", [])
+    if not items:
+        return  # nothing matched -> fall through to the normal picker
+    top = items[0]
+    # Confidence gate: a real paste is a high-coverage, in-order subsequence of
+    # its source. Verify before auto-opening, so shared-keyword false positives
+    # drop to the list instead of launching the wrong session.
+    cov = _paste_coverage(line, _session_raw(top["id"]))
+    if cov < 0.5:
+        print(f"  \033[33m~ best match only {cov:.0%} in-order — opening the list\033[0m")
+        return
+    print(f"  \033[32m✓ Best match\033[0m ({cov:.0%} in-order, {top.get('hits') or '?'} hits): "
+          f"\033[1m{top.get('title') or top['id']}\033[0m")
+    _resume_from_paste([top["id"]])  # execs
+
+
+BRACKET_PASTE = re.compile(r"\x1b\[20[01]~")  # ESC[200~ … ESC[201~ paste frame
+
+
+def _read_paste() -> str:
+    """Read pasted input tolerantly, via a few signals — any one is enough,
+    none required:
+
+      1. Bracketed paste — turn it on (ESC[?2004h); a real paste arrives framed
+         by ESC[200~ … ESC[201~. Authoritative when the terminal supports it.
+      2. Burst — drain stdin: anything still buffered right after the first line
+         arrived in the same paste burst, not typed.
+      3. Multi-line / length — captured by 1+2 above.
+
+    Markers are stripped whether or not they appear, so it works the same on
+    terminals that don't bracket pastes. ponytail: combine signals, stay
+    forgiving; worst case a typed line still routes fine (id -> open, text ->
+    search), and a bare Enter returns "" -> the list.
+    """
+    import select
+
+    sys.stdout.write("\x1b[?2004h")  # enable bracketed paste
+    sys.stdout.flush()
+    try:
+        first = input("  \033[36m›\033[0m ")
+        rest = []
+        while select.select([sys.stdin], [], [], 0.05)[0]:
+            chunk = sys.stdin.readline()
+            if not chunk:
+                break
+            rest.append(chunk)
+    finally:
+        sys.stdout.write("\x1b[?2004l")  # disable bracketed paste
+        sys.stdout.flush()
+
+    text = first + ("\n" + "".join(rest) if rest else "")
+    return BRACKET_PASTE.sub("", text).strip()
+
+
+def _normalize_ws(s: str) -> str:
+    """Drop newlines (real and JSON-escaped) and collapse whitespace, so a
+    terminal-wrapped paste compares cleanly against the session's stored text."""
+    s = s.replace("\\r\\n", " ").replace("\\n", " ").replace("\\t", " ")
+    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _paste_coverage(paste: str, session_text: str) -> float:
+    """Fraction of `paste` that appears IN ORDER in `session_text` — stdlib
+    difflib matching blocks / length, after whitespace-normalizing both sides.
+    A genuine paste scores high; coincidental keyword overlap scores low.
+    ponytail: window the haystack around the paste so difflib stays cheap on
+    multi-MB session files."""
+    import difflib
+    a = _normalize_ws(paste)
+    b = _normalize_ws(session_text)
+    if not a or not b:
+        return 0.0
+    i = b.find(a[:40])
+    if i >= 0:
+        lo = max(0, i - len(a))
+        b = b[lo: lo + 4 * len(a)]
+    elif len(b) > 8 * len(a):
+        b = b[: 8 * len(a)]
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    return sum(k.size for k in sm.get_matching_blocks()) / len(a)
+
+
+def _session_raw(session_id: str) -> str:
+    """Raw .jsonl text for a session id (empty string if not on disk)."""
+    import glob
+    hits = glob.glob(
+        os.path.expanduser(f"~/.claude/projects/**/{session_id}.jsonl"), recursive=True
+    )
+    return open(hits[0], encoding="utf-8", errors="replace").read() if hits else ""
 
 
 def main():
@@ -674,6 +803,10 @@ def main():
             sys.exit(1)
         _search_sessions(" ".join(sys.argv[2:]))
         sys.exit(0)
+
+    # Bare `cr`: paste box first; blank Enter falls through to the picker below.
+    if len(sys.argv) == 1:
+        _paste_box_or_fallthrough()
 
     hours = DEFAULT_HOURS
     show_all = False
