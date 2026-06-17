@@ -142,7 +142,17 @@ When you paste chat text (no id), `cr` resolves it through a **persistent full-t
 | 328 chats · ~40M tokens · 166 MB | ~10 s | **6 ms** | 8 ms |
 | 5,574 chats · 3.0 GB (synthetic) | ~4 min | **94 ms** | 319 ms |
 
-Build is **incremental** after the first run — only sessions whose file changed get re-indexed, so day-to-day queries are pure milliseconds. For comparison, the un-indexed full raw scan was ~5.5 s p50 at 166 MB; the index is ~900× faster there and still sub-100 ms at 3 GB. (The 3 GB corpus is *duplicated* sessions — a worst case for candidate scoring; a same-size corpus of distinct sessions resolves fewer candidates and runs faster.)
+Build is **incremental** after the first run — only sessions whose file changed get re-indexed, so day-to-day queries are pure milliseconds. (The 3 GB corpus is *duplicated* sessions — a worst case for candidate scoring; a same-size corpus of distinct sessions resolves fewer candidates and runs faster.)
+
+**Why an index** — the naive way to answer "which session is this paste from?" is brute force: read + normalize *every* session file on *every* query. It needs nothing persistent, but pays the whole corpus cost each time. Head-to-head on the same 176 MB / 328 chats:
+
+| approach | requires | query p50 |
+|---|---|---|
+| brute force (no index) | nothing — re-scans 176 MB every query, O(corpus), linear | ~19 s |
+| anchor pre-filter heuristic | nothing — skips files that can't match | ~5.5 s |
+| **FTS5 index** | one-time build + corpus-sized file on disk, incremental | **~2–6 ms** |
+
+The index spends build time + disk **once** to make every query cheap forever; brute force re-pays the full corpus cost per lookup, and the gap widens with corpus size (brute force at 3 GB is minutes/query; the index stays sub-100 ms).
 
 ---
 
