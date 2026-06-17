@@ -123,7 +123,7 @@ It parses the id out of whatever you pasted, searches `~/.claude/projects/*/` fo
 
 ### How paste-to-find works
 
-When you paste chat text (no id), `cr` does a **full-text raw scan of every session file** — not the summary index, which only holds titles. It ranks each session by *in-order n-gram coverage*: the fraction of your paste's word-chunks that appear verbatim, after normalizing away markdown, em-dashes, smart/escaped quotes, and terminal wrapping. The best match above a calibrated threshold (0.25) is opened; below it, you get the list. It also skips the session you're currently in (`CLAUDE_CODE_SESSION_ID`) — you don't resume the chat you're sitting in.
+When you paste chat text (no id), `cr` resolves it through a **persistent full-text index** — every session's normalized text indexed once into SQLite FTS5 (the summary index only holds titles, so pasted *transcript* text isn't findable there). A query is an FTS candidate lookup followed by *in-order n-gram coverage* scoring on just those candidates: the fraction of your paste's word-chunks that appear verbatim, after normalizing away markdown, em-dashes, smart/escaped quotes, and terminal wrapping. The best match above a calibrated threshold (0.25) is opened; below it, you get the list. The index refreshes incrementally (only changed sessions re-index), and the session you're currently in (`CLAUDE_CODE_SESSION_ID`) is skipped — you don't resume the chat you're sitting in.
 
 **Measured results** (180-trial calibration + adversarial batch, driven through [emux](https://github.com/eidos-agi/emux)/tmux):
 
@@ -135,16 +135,14 @@ When you paste chat text (no id), `cr` does a **full-text raw scan of every sess
 | Decoys (shuffled vocab, unrelated text) | **0 false positives** — scores max out at 0.00 |
 | When unsure | Falls through to the list — safe by design, never a misfire |
 
-**Speed** — measured over a real local corpus (**328 chats · ~40M tokens · 166 MB**, warm page cache, 71 scans):
+**Speed** — measured, indexed query latency (FTS lookup + coverage scoring):
 
-| | latency |
-|---|---|
-| min | 0.8 s |
-| p50 | 5.5 s |
-| p95 | 7.5 s |
-| p99 | 7.9 s |
+| corpus | build (one-time) | query p50 | p95 |
+|---|---|---|---|
+| 328 chats · ~40M tokens · 166 MB | ~10 s | **6 ms** | 8 ms |
+| 5,574 chats · 3.0 GB (synthetic) | ~4 min | **94 ms** | 319 ms |
 
-Each paste re-scans every session file from disk; an anchor pre-filter skips files that can't match (best case ~0.8 s). There's no persistent index yet — so the cost scales with corpus size. (The separate BM25 *summary* index used by `search_sessions` is much smaller and searches thousands of sessions in ~3 s.)
+Build is **incremental** after the first run — only sessions whose file changed get re-indexed, so day-to-day queries are pure milliseconds. For comparison, the un-indexed full raw scan was ~5.5 s p50 at 166 MB; the index is ~900× faster there and still sub-100 ms at 3 GB. (The 3 GB corpus is *duplicated* sessions — a worst case for candidate scoring; a same-size corpus of distinct sessions resolves fewer candidates and runs faster.)
 
 ---
 
